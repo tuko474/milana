@@ -1,0 +1,945 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Милана в отрыве: браузерная игра про 30 дней тура по городам России.">
+<meta name="theme-color" content="#14171c">
+<style>
+*,*::before,*::after{box-sizing:border-box}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0;-webkit-text-size-adjust:100%}
+img{max-width:100%}
+[hidden]{display:none!important}
+</style>
+<title>Милана в отрыве</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=JetBrains+Mono:wght@500&family=Unbounded:wght@500;700&display=swap">
+<style>
+:root{
+  /* Layout: phone-first column (road sign, gauges, action pad); on wide screens the story feed moves to a right column */
+  --asphalt:#14171c; --panel:#1d222a; --panel-2:#272e38; --line:#363e4a;
+  --paper:#ece6d6; --muted:#9aa3ae;
+  --sign:#1c4ea0; --sign-ink:#ffffff;
+  --route:#2b8b53; --mark:#f2c230; --siren:#d9403f; --ink-on-mark:#1a1708;
+  --f-display:'Unbounded','Arial Black',system-ui,sans-serif;
+  --f-body:'Golos Text',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  --f-mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+html,body{background:var(--asphalt);color:var(--paper)}
+body{font-family:var(--f-body);font-size:15px;line-height:1.45}
+button{font:inherit;color:inherit}
+.app{max-width:1060px;margin:0 auto;padding-block:20px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:22px;grid-template-columns:minmax(0,1fr)}
+.left{display:grid;gap:16px;min-width:0}
+.right{display:grid;gap:12px;min-width:0;align-content:start}
+@media (min-width:880px){
+  .app{grid-template-columns:minmax(0,430px) minmax(0,1fr);align-items:start}
+  .right{position:sticky;top:calc(env(safe-area-inset-top,0px) + 16px);max-height:calc(100vh - 40px);overflow:auto;padding-right:4px}
+}
+
+/* road sign */
+.sign{background:var(--sign);border-radius:10px;padding:6px;box-shadow:0 14px 34px -16px rgba(0,0,0,.7)}
+.sign-inner{border:3px solid var(--sign-ink);border-radius:6px;padding:12px 16px 16px;display:grid;gap:8px;color:var(--sign-ink)}
+.sign-top{display:flex;justify-content:space-between;gap:12px;align-items:center;font-family:var(--f-mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase}
+.sign h1{font-family:var(--f-display);font-weight:700;font-size:clamp(23px,6.4vw,32px);line-height:1.08;margin:0;text-wrap:balance}
+.sign-sub{font-size:14px;opacity:.88}
+.route{display:inline-block;background:var(--siren);color:var(--sign-ink);font-family:var(--f-display);font-weight:500;font-size:11px;letter-spacing:.04em;padding:3px 7px;border-radius:3px;border:1.5px solid var(--sign-ink)}
+.dash{height:4px;background:repeating-linear-gradient(90deg,var(--mark) 0 26px,transparent 26px 44px);opacity:.85;border-radius:2px}
+
+.hero{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+.who{font-size:15px}.who b{font-family:var(--f-display);font-weight:700;font-size:17px}
+.mood{color:var(--mark)}
+.money{font-family:var(--f-mono);font-size:20px;font-variant-numeric:tabular-nums}
+
+/* gauges */
+.gauges{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 16px}
+.g{display:grid;gap:5px;min-width:0}
+.g-l{display:flex;justify-content:space-between;gap:8px;font-size:11.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+.g-l b{font-family:var(--f-mono);font-weight:500;color:var(--paper);letter-spacing:0;font-variant-numeric:tabular-nums}
+.bar{height:8px;background:var(--panel-2);border-radius:2px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--c);transition:width .45s ease}
+.segs{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}
+.segs i{height:8px;background:var(--panel-2);border-radius:1px}
+.segs i.on{background:var(--mark)}
+.segs i.hot{background:var(--siren)}
+.nums{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.num{background:var(--panel);border-radius:8px;padding:8px 10px;display:grid;gap:2px;min-width:0}
+.num span{font-size:11.5px;letter-spacing:.01em;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.num b{font-family:var(--f-mono);font-weight:500;font-size:15px;font-variant-numeric:tabular-nums}
+
+/* actions */
+.actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.act,.choice{appearance:none;border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:11px 10px;text-align:left;display:grid;gap:4px;align-content:start;cursor:pointer;min-height:64px;transition:background .15s,border-color .15s,transform .1s}
+.act:hover:not(:disabled),.choice:hover:not(:disabled){border-color:var(--mark);background:var(--panel-2)}
+.act:active:not(:disabled),.choice:active:not(:disabled){transform:translateY(1px)}
+.act:focus-visible,.choice:focus-visible,.ghost:focus-visible,.stop:focus-visible{outline:2px solid var(--mark);outline-offset:2px}
+.act:disabled,.choice:disabled{opacity:.38;cursor:not-allowed}
+.act-t{font-family:var(--f-display);font-size:12.5px;font-weight:500;line-height:1.2}
+.act-m{font-family:var(--f-mono);font-size:10.5px;color:var(--muted);line-height:1.3}
+.act.sleep{background:var(--mark);border-color:var(--mark);color:var(--ink-on-mark)}
+.act.sleep .act-m{color:var(--ink-on-mark);opacity:.75}
+.act.sleep:hover:not(:disabled){background:var(--mark);filter:brightness(1.06)}
+.foot{display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:13px;color:var(--muted)}
+.ghost{background:none;border:1px solid var(--line);border-radius:6px;padding:6px 10px;cursor:pointer;color:var(--muted)}
+.ghost:hover{color:var(--paper);border-color:var(--muted)}
+
+/* feed */
+.feed-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.feed-head h2{font-family:var(--f-display);font-weight:700;font-size:18px;margin:0}
+.feed-head span{font-size:12px;color:var(--muted)}
+.feed{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.ev{background:var(--panel);border-radius:8px;padding:11px 14px 12px;display:grid;gap:6px}
+.ev-top{display:flex;align-items:center;gap:8px;font-family:var(--f-mono);font-size:11px;color:var(--muted)}
+.tag{padding:1px 6px;border-radius:3px;background:var(--panel-2);color:var(--paper);text-transform:lowercase}
+.tag.good{background:rgba(43,139,83,.28);color:#9fe0b6}
+.tag.bad{background:rgba(217,64,63,.25);color:#f3a9a8}
+.tag.big{background:var(--mark);color:var(--ink-on-mark)}
+.ev p{margin:0;max-width:62ch}
+.ev.fresh{animation:pop .4s ease}
+@keyframes pop{from{transform:translateY(-4px);opacity:.4}to{transform:none;opacity:1}}
+.chips{display:flex;flex-wrap:wrap;gap:5px}
+.chip{font-family:var(--f-mono);font-size:11px;padding:1px 6px;border-radius:3px;border:1px solid var(--line);color:var(--muted);font-variant-numeric:tabular-nums}
+.chip.up{color:#9fe0b6;border-color:rgba(43,139,83,.6)}
+.chip.dn{color:#f3a9a8;border-color:rgba(217,64,63,.55)}
+
+/* modal */
+.modal{position:fixed;inset:0;z-index:50;background:rgba(7,9,12,.74);display:grid;grid-template-rows:minmax(0,1fr);place-items:end center;padding:calc(16px + env(safe-area-inset-top,0px)) max(12px,env(safe-area-inset-right,0px)) calc(12px + env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px))}
+@media (min-width:640px){.modal{place-items:center}}
+.modal[hidden]{display:none}
+.sheet{width:100%;max-width:540px;max-height:100%;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px;display:grid;gap:14px;animation:up .22s ease}
+@keyframes up{from{transform:translateY(12px);opacity:0}to{transform:none;opacity:1}}
+.sheet h3{font-family:var(--f-display);font-weight:700;font-size:19px;line-height:1.2;margin:0;text-wrap:balance}
+.sheet p{margin:0}
+.kicker{font-family:var(--f-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--mark)}
+.choices{display:grid;gap:8px}
+.choice{min-height:0}
+.choice .act-t{font-size:13.5px}
+.muted{color:var(--muted)}
+
+/* karaoke */
+.lyric{font-family:var(--f-display);font-weight:500;font-size:17px;line-height:1.35;min-height:2.8em}
+.track{position:relative;height:48px;background:var(--panel-2);border-radius:6px;overflow:hidden;cursor:pointer;touch-action:manipulation}
+.zone{position:absolute;top:0;bottom:0;background:rgba(43,139,83,.38);border-left:2px solid var(--route);border-right:2px solid var(--route)}
+.zone b{position:absolute;top:0;bottom:0;left:35%;right:35%;background:rgba(43,139,83,.5)}
+.needle{position:absolute;top:0;bottom:0;width:4px;margin-left:-2px;background:var(--mark);box-shadow:0 0 12px rgba(242,194,48,.7)}
+.notes{display:flex;gap:6px}
+.notes i{flex:1;height:6px;border-radius:2px;background:var(--panel-2)}
+.notes i.n2{background:var(--route)}.notes i.n1{background:var(--mark)}.notes i.n0{background:var(--siren)}
+.verdict{font-family:var(--f-mono);font-size:13px;min-height:1.4em;color:var(--mark)}
+.big-btn{appearance:none;border:0;border-radius:8px;background:var(--mark);color:var(--ink-on-mark);font-family:var(--f-display);font-weight:700;font-size:15px;padding:14px;cursor:pointer;touch-action:manipulation}
+.big-btn:focus-visible{outline:2px solid var(--paper);outline-offset:2px}
+.big-btn:disabled{opacity:.4;cursor:default}
+
+/* fight */
+.fighters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.ftr{display:grid;gap:5px;min-width:0}
+.ftr b{font-family:var(--f-display);font-weight:500;font-size:13px;line-height:1.25}
+.tell{font-family:var(--f-mono);font-size:13px;background:var(--panel-2);padding:10px 12px;border-radius:6px}
+.moves{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.moves .choice{min-height:58px}
+.flog{font-size:13.5px;color:var(--muted);min-height:2.8em}
+
+/* travel */
+.strip{position:relative;display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:2px;padding-top:6px}
+.strip::before{content:"";position:absolute;left:6%;right:6%;top:14px;height:4px;background:repeating-linear-gradient(90deg,var(--mark) 0 9px,transparent 9px 15px);opacity:.7}
+.stop{position:relative;display:grid;justify-items:center;gap:6px;background:none;border:0;cursor:pointer;padding:0 0 4px;border-radius:6px;min-width:0}
+.stop .dot{width:18px;height:18px;border-radius:50%;background:var(--asphalt);border:3px solid var(--muted);position:relative;z-index:1}
+.stop.been .dot{border-color:var(--route)}
+.stop.here .dot{background:var(--mark);border-color:var(--mark)}
+.stop.sel .dot{box-shadow:0 0 0 4px rgba(242,194,48,.35);border-color:var(--mark)}
+.stop span{font-family:var(--f-mono);font-size:10.5px;color:var(--muted)}
+.stop.sel span,.stop.here span{color:var(--paper)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px;border:2px solid var(--muted)}
+.legend i.l-here{background:var(--mark);border-color:var(--mark)}.legend i.l-been{border-color:var(--route)}
+
+/* ending ticket */
+.ticket{border:2px dashed var(--line);border-radius:10px;padding:16px;display:grid;gap:10px}
+.ticket .rank{font-family:var(--f-display);font-weight:700;font-size:24px;color:var(--mark);line-height:1.15;text-wrap:balance}
+.kv{display:grid;grid-template-columns:1fr auto;gap:4px 12px;font-size:14px}
+.kv b{font-family:var(--f-mono);font-weight:500;text-align:right;font-variant-numeric:tabular-nums}
+
+
+/* stage */
+.stage{position:relative;height:190px;border-radius:10px;overflow:hidden;background:var(--panel)}
+.stage canvas,.mini-stage{display:block;width:100%;height:100%}
+.mini-stage{height:150px;border-radius:8px;background:var(--panel-2)}
+.stage-cap{position:absolute;left:10px;top:10px;font-family:var(--f-mono);font-size:11.5px;background:rgba(10,12,16,.72);color:var(--paper);padding:4px 8px;border-radius:4px;max-width:calc(100% - 20px)}
+.actions.busy .act{opacity:.55}
+.fbody{display:grid;gap:12px}
+@media (min-width:880px){.stage{height:210px}}
+@media (max-width:380px){.nums{grid-template-columns:repeat(2,minmax(0,1fr))}.act-t{font-size:11.5px}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <section class="left">
+    <header class="sign" aria-live="polite">
+      <div class="sign-inner">
+        <div class="sign-top"><span id="dayLbl">День 1 из 30</span><span class="route" id="routeLbl">М-4</span></div>
+        <h1 id="cityName">Москва</h1>
+        <div class="sign-sub" id="citySub"></div>
+      </div>
+    </header>
+    <div class="stage"><canvas id="stageCv" role="img" aria-label="Сцена: что сейчас делает Милана"></canvas><div class="stage-cap" id="stageCap" hidden></div></div>
+    <div class="hero">
+      <div class="who"><b>Милана</b>, 20 · <span class="mood" id="moodLbl">в норме</span> · <span id="clockLbl">10:00</span></div>
+      <div class="money" id="moneyLbl">5 000 ₽</div>
+    </div>
+    <div class="gauges" id="gauges"></div>
+    <div class="nums" id="nums"></div>
+    <div class="dash" aria-hidden="true"></div>
+    <div class="actions" id="actions"></div>
+    <div class="foot"><span id="tripLbl">Города: 1 из 8</span><button class="ghost" id="newGame" type="button">Новый тур</button></div>
+  </section>
+  <section class="right">
+    <div class="feed-head"><h2>Лента</h2><span>свежее сверху</span></div>
+    <ol class="feed" id="feed"></ol>
+  </section>
+</div>
+<div class="modal" id="modal" hidden><div class="sheet" id="sheet" role="dialog" aria-modal="true"></div></div>
+<script>
+// ---------- data ----------
+const CITIES={
+  kgd:{name:'Калининград',short:'Клд',route:'А-229',lat:54.71,lon:20.51,sub:'Балтика, янтарь и ветер с моря',bar:900,hostel:900,pay:1.0,fight:.8},
+  spb:{name:'Санкт-Петербург',short:'СПб',route:'М-11',lat:59.94,lon:30.31,sub:'Рубинштейна, разводные мосты и дождь',bar:1000,hostel:1000,pay:1.2,fight:.9},
+  msk:{name:'Москва',short:'Мск',route:'М-4',lat:55.75,lon:37.62,sub:'Патрики, крыши и цены как в космосе',bar:1600,hostel:1500,pay:1.6,fight:1},
+  sochi:{name:'Сочи',short:'Сочи',route:'А-147',lat:43.6,lon:39.72,sub:'Море, пальмы и курортные тарифы',bar:1300,hostel:1400,pay:1.2,fight:.8},
+  kzn:{name:'Казань',short:'Кзн',route:'М-7',lat:55.79,lon:49.12,sub:'Баумана, чак-чак и кальянные',bar:800,hostel:800,pay:1.0,fight:1},
+  ekb:{name:'Екатеринбург',short:'Екб',route:'Р-242',lat:56.84,lon:60.6,sub:'Плотинка, рок и суровые люди',bar:850,hostel:850,pay:1.05,fight:1.4},
+  nsk:{name:'Новосибирск',short:'Нск',route:'Р-254',lat:55.03,lon:82.92,sub:'Мороз, Академгородок и размах',bar:750,hostel:750,pay:1.0,fight:1.2},
+  vdk:{name:'Владивосток',short:'Влад',route:'А-370',lat:43.12,lon:131.89,sub:'Сопки, крабы и Тихий океан',bar:1100,hostel:1000,pay:1.15,fight:1.1},
+};
+const ORDER=['kgd','spb','msk','sochi','kzn','ekb','nsk','vdk'];
+
+const ENEMIES=[
+  {n:'Гопник у ларька',hp:30,d:8,ai:[.5,.25,.25]},
+  {n:'Ревнивая девушка с маникюром',hp:24,d:7,ai:[.6,.15,.25]},
+  {n:'Вышибала Гена',hp:46,d:11,ai:[.45,.4,.15]},
+  {n:'Футбольный фанат в шарфе',hp:36,d:9,ai:[.55,.2,.25]},
+  {n:'Байкер в кожаной жилетке',hp:40,d:10,ai:[.5,.3,.2]},
+  {n:'Таксист, который «знает короткую дорогу»',hp:28,d:7,ai:[.4,.3,.3]},
+  {n:'Качок из фитнес-клуба',hp:42,d:10,ai:[.6,.3,.1]},
+];
+const TELLS={
+  atk:['замахивается с плеча','сжимает кулаки и прёт вперёд','орёт «ну всё, держись»'],
+  blk:['поднял руки к лицу','встал боком и закрылся','пятится и прикрывается'],
+  dge:['пританцовывает на месте','пригнулся и смотрит исподлобья','качает корпусом туда-сюда'],
+};
+
+const SONGS=[
+  {t:'Трасса М-11',l:['Фары режут ночь пополам','я не сплю, я лечу по своим делам','мама, я в Питере, всё хорошо','просто сердце громче, чем шоссе','трасса, держи меня, не отпускай']},
+  {t:'Верхняя боковая',l:['Верхняя боковая, чай в подстаканнике','проводница смотрит, как на хулиганку','за окном Россия, бесконечный трек','я пою вагону, вагон поёт в ответ','на конечной выйду другой']},
+  {t:'Не звони в пять утра',l:['Не звони мне в пять утра','я ещё не дома, мам, пока','у меня тут целый город','и сто новых лиц вокруг','утром всё расскажу, честно']},
+  {t:'Королева района',l:['Кроссы белые, взгляд прямой','каждый двор считает меня своей','если громко, значит я','если весело, значит мы','королева района, привет']},
+];
+
+const GIGS=[
+  {t:'Официантка в кафе',p:2600,note:'Ноги гудят, чаевые норм.'},
+  {t:'Промоутер у клуба',p:2100,fx:{content:1,fun:4},note:'Зазывала народ и сама чуть не зашла.'},
+  {t:'Раздавать листовки',p:1500,fx:{fun:-6},note:'Тоска смертная, зато без начальника.'},
+  {t:'Бармен на подмену',p:3000,fx:{booze:1},note:'Пару раз «проверила, что наливает».'},
+  {t:'Курьер на самокате',p:2800,fx:{hp:-4},note:'Чуть не въехала в маршрутку.'},
+  {t:'Ведущая на свадьбе',p:7000,need:'vocal',min:4,fx:{fun:8,fame:300},note:'Спела так, что прослезился даже тамада.'},
+  {t:'Массовка на съёмках сериала',p:2400,fx:{fame:150,content:1},note:'Восемь часов стояла на фоне в пуховике.'},
+  {t:'Охрана на фестивале',p:4200,need:'punch',min:4,fx:{fame:200},note:'Никто даже не пытался пролезть без браслета.'},
+];
+
+const BAR_LINES=[
+  'Взяла пару шотов и танцевала до хрипоты.',
+  'Обсудила жизнь с барменом. Бармен сдался первым.',
+  'Заказала коктейль с самым длинным названием в меню.',
+  'Спорила с незнакомцами о музыке и победила.',
+  'Танцевала на стуле. Стул выжил.',
+  'Подпевала всем трекам подряд, даже незнакомым.',
+];
+
+const ROAD={
+  hitch:[
+    ['Дальнобойщик Валера рассказал всю жизнь и подарил термос.','good',{fun:8,content:2}],
+    ['Застряла ночью на заправке посреди трассы. Холодно и скучно.','bad',{hp:-8,fun:-6}],
+    ['Подвезла семья на «Ниве», накормили пирожками.','good',{hp:8,fun:6}],
+    ['Водитель всю дорогу слушал шансон. Милана выучила три альбома.','',{vocal:.3,fun:-3}],
+  ],
+  train:[
+    ['Соседи по плацкарту достали гитару, пели до двух ночи.','good',{fun:12,booze:1,content:1}],
+    ['Проводница отругала за громкий смех. Дважды.','',{fun:-3}],
+    ['Боковушка у туалета. Всю ночь хлопала дверь.','bad',{hp:-4,fun:-5}],
+    ['Выиграла у дембелей в «дурака» пачку печенья и уважение.','good',{fun:8,fame:100}],
+  ],
+  plane:[
+    ['Рейс задержали на четыре часа. Изучила весь дьюти-фри.','bad',{fun:-8}],
+    ['Соседка по креслу оказалась визажисткой и накрасила Милану прямо в полёте.','good',{fun:8,content:1}],
+    ['Долетела спокойно, проспала весь полёт.','',{hp:3}],
+  ],
+};
+
+const VPISKA=[
+  ['Вписалась у новых знакомых. Варили пельмени в три ночи и смотрели старые клипы.','good',{fun:12,hp:6}],
+  ['Вписка оказалась шумной: никто не спал, а утром из рюкзака пропала тысяча.','bad',{money:-1000,hp:-3}],
+  ['Спала на надувном матрасе, который сдулся к утру. Зато бесплатно.','',{hp:2}],
+];
+
+// walk events: run() uses engine helpers (S, C, fx, say, ask, fight, enemy, rndEnemy, rnd, chance, fmt)
+const WALK=[
+  {w:2,run(){const m=rnd(3,10)*100;say(`Нашла на лавочке ${fmt(m)} ₽. Оглянулась, никого. Значит, судьба.`,'находка','good',fx({money:m,fun:5}))}},
+  {w:3,run(){ask('Компания на набережной','Ребята с колонкой машут: «Давай к нам, у нас весело».',[
+    {t:'Пойти',m:'+кайф, +градус',go(){say('Пели, танцевали, кто-то достал гитару. Где все эти люди теперь, неизвестно.','тусовка','good',fx({fun:18,booze:2,content:2,hp:-3}))}},
+    {t:'Пройти мимо',m:'ничего не будет',go(){say('Прошла мимо с видом королевы. Ребята проводили взглядом.','прогулка','',[])}}])}},
+  {w:3,run(){ask('Гопник у подъезда','«Слышь, есть позвонить?» Классика.',[
+    {t:'Врезать',m:'драка',go(){fight(enemy('Гопник у ларька'))}},
+    {t:'Отшутиться',m:'шанс зависит от вокала',go(){if(chance(.35+S.vocal*.06))say('Спела ему частушку про его же кепку. Ушёл смеясь, даже извинился.','район','good',fx({fun:10,fame:120,content:1}));else say('Шутка не зашла. Пришлось толкнуть его в кусты и быстро уйти.','район','bad',fx({hp:-8,energy:-5}))}},
+    {t:'Свалить',m:'−10 сил',go(){say('Пробежала два квартала на каблуках. Кардио засчитано.','район','',fx({energy:-10}))}}])}},
+  {w:2,run(){say('Блогер снимал уличный опрос. Милана ответила так дерзко, что ролик набрал просмотры.','слава','good',fx({fame:rnd(4,20)*100,content:1}))}},
+  {w:2,run(){ask('Пишет бывший','«Скучаю. Ты где?»',[
+    {t:'Ответить «в лучшей жизни»',m:'+кайф',go(){say('Отправила фото с набережной и заблокировала. Настроение отличное.','личное','good',fx({fun:14}))}},
+    {t:'Погрустить над шавермой',m:'−кайф',go(){say('Пять минут грусти. Потом шаверма закончилась, и грусть вместе с ней.','личное','bad',fx({fun:-10,hp:4}))}}])}},
+  {w:2,run(){if(S.booze>=2){const p=Math.min(S.money,1000);say(`Патруль попросил документы. От Миланы пахло весельем: протокол по 20.21 КоАП и штраф ${fmt(p)} ₽.`,'полиция','bad',fx({money:-p,fun:-8}))}else say('Патруль проверил документы. Всё чисто, даже пожелали хорошего вечера.','полиция','',[])}},
+  {w:1,run(){ask('Тату-салон со скидкой','Мастер скучает и предлагает тату за 3 000 ₽.',[
+    {t:'Набить «Свобода» на рёбрах',m:'−3 000 ₽, +подписчики',dis:()=>S.money<3000,go(){S.tattoos++;say('Больно, но красиво. Подписчики оценили.','тату','good',fx({money:-3000,fame:rnd(5,15)*100,content:2,hp:-4}))}},
+    {t:'Не сегодня',m:'ничего не будет',go(){say('Пообещала вернуться. Мастер не поверил.','тату','',[])}}])}},
+  {w:2,run(){ask('Разборки во дворе','Две компании выясняют отношения, кто-то уже снял куртку.',[
+    {t:'Влезть',m:'драка',go(){fight(rndEnemy())}},
+    {t:'Снимать на телефон',m:'+3 контента',go(){say('Сняла всё в 4K. Будет что выложить.','драма','',fx({content:3}))}}])}},
+  {w:2,run(){ask('Спор на деньги','Мужик у бара уверяет, что перепьёт любую девчонку. Ставка 2 000 ₽.',[
+    {t:'Принять спор',m:'+3 градуса, ставка 2 000 ₽',dis:()=>S.money<2000,go(){S.drinks+=3;if(chance(.45))say('Мужик сполз под стол на третьем. Милана забрала ставку и спела над ним колыбельную.','спор','big',fx({money:2000,booze:3,fame:400,content:2,hp:-6}));else say('Мужик оказался дальнобойщиком с тридцатилетним стажем. Деньги ушли.','спор','bad',fx({money:-2000,booze:3,hp:-8}))}},
+    {t:'Посмеяться и уйти',m:'ничего не будет',go(){say('«В другой раз, дядя». Дядя расстроился.','спор','',[])}}])}},
+  {w:1,run(){ask('Местный рэпер','У него студия за углом. Зовёт записать куплет.',[
+    {t:'Записать',m:'зависит от вокала',go(){S.songs++;if(S.vocal>=3.5)say('Куплет вышел огонь. Трек разлетелся по чатам.','музыка','big',fx({fame:rnd(30,60)*100,fun:15,content:2}));else say('Звучит, как кошка в лифте. Рэпер вежливо сказал «интересно».','музыка','',fx({fun:5,content:1}))}},
+    {t:'Отказаться',m:'ничего не будет',go(){say('Сказала, что занята. Он ещё неделю ставил лайки.','музыка','',[])}}])}},
+  {w:1,when:()=>S.content>0,run(){say('Потеряла телефон. Через час нашла в такси, но несохранённые видео пропали.','беда','bad',fx({content:-S.content,fun:-12}))}},
+  {w:2,run(){say('Встретила подругу из родного города. Обнимались на всю улицу, подруга угостила ужином.','встреча','good',fx({fun:16,hp:8}))}},
+  {w:1,run(){say('Бабушки у подъезда обсудили её юбку, макияж и будущее. Милана помахала им и пошла дальше.','район','',fx({fun:3,content:1}))}},
+  {w:3,city:'spb',run(){say('Засиделась на Васильевском, а мосты развели. Гуляла до утра по набережной, рассвет был розовый.','мосты','good',fx({fun:20,energy:-15,content:2}))}},
+  {w:3,city:'sochi',run(){say('Ночное купание в Чёрном море. Холодно, громко, лучше любого бара.','море','good',fx({fun:20,hp:6,content:2}))}},
+  {w:3,city:'kzn',run(){say('Бабушка на рынке угостила чак-чаком и назвала «кызым». Жизнь прекрасна.','казань','good',fx({hp:10,fun:8}))}},
+  {w:3,city:'msk',run(){ask('Вечеринка на крыше','Знакомые знакомых пробрались на крышу у Чистых прудов.',[
+    {t:'Полезть',m:'рискованно',go(){if(chance(.7))say('Город в огнях, музыка, вид на всю Москву. Лучшие сторис за неделю.','крыша','big',fx({fun:22,content:3,booze:1}));else{const p=Math.min(S.money,1000);say(`Приехала полиция. Всех переписали, штраф ${fmt(p)} ₽.`,'полиция','bad',fx({money:-p,fun:-5}))}}},
+    {t:'Остаться внизу',m:'+немного кайфа',go(){say('Смотрела на крышу снизу и ела мороженое.','крыша','',fx({fun:3}))}}])}},
+  {w:3,city:'ekb',run(){ask('Рок-концерт на Плотинке','Местная группа играет так, что дрожит асфальт.',[
+    {t:'В слэм',m:'+кайф, может прилететь',go(){if(chance(.6))say('Отпрыгала весь сет в первом ряду. Солист бросил ей медиатор.','концерт','good',fx({fun:22,hp:-6,content:2}));else fight(enemy('Футбольный фанат в шарфе'),'В слэме кто-то слишком сильно толкнул. Милана толкнула в ответ.')}},
+    {t:'Слушать с краю',m:'+кайф',go(){say('Подпевала с краю, выучила припев.','концерт','good',fx({fun:10}))}}])}},
+  {w:3,city:'nsk',run(){say('На улице минус двадцать пять. Пыталась гулять в кроссовках, сдалась у ближайшего ТЦ.','мороз','bad',fx({hp:-8,fun:-4,content:1}))}},
+  {w:3,city:'vdk',run(){say('Залезла на сопку Орлиное гнездо, смотрела на Золотой мост. Потом съела краба на рынке.','сопки','good',fx({fun:16,hp:8,money:-Math.min(S.money,600),content:2}))}},
+  {w:3,city:'kgd',run(){const m=rnd(5,12)*100;say(`На пляже в Зеленоградске нашла кусок янтаря и продала туристу за ${fmt(m)} ₽.`,'янтарь','good',fx({money:m,fun:8}))}},
+];
+// ---------- engine ----------
+let S,busy=false,STAGE=null;
+const MAX_DAY=30, KEY='milana-tour-v1';
+const $=id=>document.getElementById(id);
+const rnd=(a,b)=>a+Math.floor(Math.random()*(b-a+1));
+const chance=p=>Math.random()<p;
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+const shuffle=a=>a.map(v=>[Math.random(),v]).sort((x,y)=>x[0]-y[0]).map(x=>x[1]);
+const clamp=(v,a=0,b=100)=>Math.max(a,Math.min(b,v));
+const fmt=n=>Math.round(n).toLocaleString('ru-RU');
+const hh=h=>String(Math.floor(h)%24).padStart(2,'0')+':'+String(Math.round((h%1)*60)).padStart(2,'0');
+const C=()=>CITIES[S.city];
+const enemy=n=>Object.assign({},ENEMIES.find(e=>e.n===n)||ENEMIES[0]);
+const rndEnemy=()=>Object.assign({},pick(ENEMIES));
+
+function fresh(){return{day:1,city:'msk',money:5000,hp:100,energy:100,fun:55,booze:0,fame:312,content:0,vocal:1,punch:1,hour:10,
+  visited:{msk:1},km:0,fights:0,wins:0,songs:0,drinks:0,tattoos:0,deals:0,feed:[],over:false,endKind:'',seq:0}}
+
+function dist(a,b){const A=CITIES[a],B=CITIES[b],R=6371,r=x=>x*Math.PI/180;
+  const h=Math.sin(r(B.lat-A.lat)/2)**2+Math.cos(r(A.lat))*Math.cos(r(B.lat))*Math.sin(r(B.lon-A.lon)/2)**2;
+  return Math.round(2*R*Math.asin(Math.sqrt(h))*1.25/10)*10}
+
+const FX_LBL={money:'₽',hp:'здоровья',energy:'сил',fun:'кайфа',booze:'градус',fame:'подп.',content:'контент',vocal:'вокал',punch:'удар'};
+function fx(e){const chips=[];
+  for(const k in e){const v=e[k];if(!v)continue;const before=S[k];
+    if(k==='money'||k==='fame')S[k]=Math.max(0,S[k]+v);
+    else if(k==='booze')S.booze=clamp(S.booze+v,0,6);
+    else if(k==='content')S.content=clamp(S.content+v,0,10);
+    else if(k==='vocal'||k==='punch')S[k]=Math.min(10,+(S[k]+v).toFixed(1));
+    else S[k]=clamp(S[k]+v);
+    const d=S[k]-before;if(!d)continue;
+    const sign=d>0?'+':'−',abs=Math.abs(d);
+    const t=k==='money'?`${sign}${fmt(abs)} ₽`:`${sign}${(k==='vocal'||k==='punch')?abs.toFixed(1):fmt(abs)} ${FX_LBL[k]}`;
+    chips.push({t,c:k==='booze'?'':(d>0?'up':'dn')});
+  }
+  return chips}
+
+function say(text,tag,kind,chips){
+  S.feed.unshift({id:++S.seq,d:Math.min(S.day,MAX_DAY),h:S.hour,c:S.city,text,tag,kind:kind||'',chips:chips||[]});
+  if(S.feed.length>80)S.feed.length=80}
+
+// ---------- modal ----------
+function openSheet(html){$('sheet').innerHTML=html;$('modal').hidden=false;
+  const f=$('sheet').querySelector('button:not(:disabled)');if(f)f.focus({preventScroll:true})}
+function closeSheet(){$('modal').hidden=true;$('sheet').innerHTML=''}
+function ask(title,text,choices,kicker){
+  let h=`<div class="kicker">${kicker||C().name}</div><h3>${title}</h3><p>${text}</p><div class="choices">`;
+  choices.forEach((c,i)=>{const dis=c.dis&&c.dis();
+    h+=`<button type="button" class="choice" data-i="${i}" ${dis?'disabled':''}><span class="act-t">${c.t}</span><span class="act-m">${c.m||''}</span></button>`});
+  openSheet(h+'</div>');
+  $('sheet').querySelectorAll('.choice').forEach(b=>b.onclick=()=>{closeSheet();choices[+b.dataset.i].go();done()});
+}
+
+// ---------- flow ----------
+const DEALS=[[5000,5000,'Первая реклама: доставка суши заплатила за упоминание'],[25000,15000,'Бренд купальников прислал коллекцию и гонорар'],[100000,50000,'Музыкальный лейбл предложил контракт']];
+function sponsors(){while(S.deals<DEALS.length&&S.fame>=DEALS[S.deals][0]){const d=DEALS[S.deals++];say(`${d[2]}: ${fmt(d[1])} ₽.`,'реклама','big',fx({money:d[1],fun:10}))}}
+
+function done(){
+  if(busy){render();save();return}
+  sponsors();
+  if(!$('modal').hidden||S.over){render();save();return}
+  if(S.hp<=0)return ending('hp');
+  if(S.energy<=0||S.hour>=29){
+    say(S.energy<=0?'Силы кончились. Милана засыпает на ходу.':'Уже утро, а Милана ещё не ложилась. Организм требует подушку.','отбой','bad',[]);
+    render();save();return sleepMenu(true)}
+  render();save();
+}
+
+const ACTIONS=[
+  {id:'walk',t:()=>'Гулять',e:15,h:2,m:()=>'−15 сил · 2 ч'},
+  {id:'bar',t:()=>'В бар',e:15,h:3,cost:()=>C().bar,m:()=>`−${fmt(C().bar)} ₽ · 3 ч`},
+  {id:'sing',t:()=>'Петь',e:20,h:2,m:()=>'−20 сил · 2 ч'},
+  {id:'fight',t:()=>'Нарваться',e:20,h:1,m:()=>'−20 сил · драка'},
+  {id:'work',t:()=>'Подработка',e:35,h:5,m:()=>'−35 сил · 5 ч'},
+  {id:'food',t:()=>S.city==='spb'?'Шаверма':'Шаурма',e:0,h:1,cost:()=>350,m:()=>'−350 ₽ · +здоровье'},
+  {id:'post',t:()=>'Сторис',e:5,h:1,need:()=>S.content>0,m:()=>S.content?`контента: ${S.content}`:'нечего выложить'},
+  {id:'travel',t:()=>'Уехать',e:0,h:0,m:()=>'в другой город'},
+  {id:'sleep',t:()=>'Спать',e:0,h:0,m:()=>'закончить день',cls:'sleep'},
+];
+const canDo=a=>S.energy>=a.e&&(!a.cost||S.money>=a.cost())&&(!a.need||a.need());
+
+const SCENE={walk:[1.9,'гуляет'],bar:[2.1,'отрывается в баре'],food:[1.5,'перекусывает'],post:[1.9,'снимает сторис']};
+function setCap(t){const el=$('stageCap');if(!el)return;el.textContent=t||'';el.hidden=!t}
+function scene(name,o,dur,cb){if(!STAGE){cb&&cb();return done()}
+  busy=true;setCap(o&&o.cap);render();STAGE.play(name,o,dur,()=>{busy=false;setCap('');if(cb)cb();done()})}
+function doAction(id){
+  const a=ACTIONS.find(x=>x.id===id);if(!a||!canDo(a)||busy)return;
+  if(id==='travel')return travelMenu();
+  if(id==='sleep')return sleepMenu(false);
+  S.energy=clamp(S.energy-a.e);S.hour+=a.h;
+  if(id==='sing'||id==='fight'||id==='work'){H[id]();return done()}
+  const sc=SCENE[id];scene(id,{cap:`Милана ${sc[1]} · ${C().name}`},sc[0],()=>H[id]());
+}
+
+const H={
+  walk(){const pool=WALK.filter(e=>(!e.city||e.city===S.city)&&(!e.when||e.when()));
+    let t=pool.reduce((s,e)=>s+e.w,0)*Math.random();for(const e of pool){t-=e.w;if(t<=0)return e.run()}pool[0].run()},
+  bar(){const c=C();S.money-=c.bar;S.drinks++;
+    say(pick(BAR_LINES),'бар','',fx({fun:rnd(10,16),booze:1,hp:-4,content:1}));
+    if(S.booze>=4&&chance(.5))return blackout();
+    if(chance(.16*c.fight))return ask('Конфликт у стойки',pick(['Какой-то тип пролил на Милану пиво и не извинился.','Девушка за соседним столом заявила, что Милана строит глазки её парню.','Компания у бильярда решила, что это их бар.']),[
+      {t:'Разобраться',m:'драка',go(){fight(rndEnemy())}},
+      {t:'Забить и уйти',m:'−кайф',go(){say('Ушла, хлопнув дверью. Вечер немного испорчен.','бар','bad',fx({fun:-8}))}}],'Бар');
+    if(chance(.28))pick([
+      ()=>say('Бармен налил за счёт заведения: «Ты тут лучше всех танцуешь».','бар','good',fx({booze:1,fun:6})),
+      ()=>say('Компания за соседним столом взяла Милану к себе и закрыла её счёт.','бар','good',fx({money:Math.round(c.bar*.8),fun:8})),
+      ()=>{S.songs++;say('Выхватила микрофон у диджея и спела. Бар хлопал стоя.','бар','big',fx({fame:rnd(3,9)*100,content:1,fun:8}))},
+    ])()},
+  sing(){singMenu()},
+  fight(){fight(rndEnemy(),pick(['Милана нашла того, кто сегодня посмотрел на неё не так.','Кто-то назвал её «деточкой». Зря.','Вечер был слишком спокойным. Милана это исправила.']))},
+  work(){const c=C();
+    const ok=GIGS.filter(g=>!g.need||S[g.need]>=g.min),lk=GIGS.filter(g=>g.need&&S[g.need]<g.min);
+    const list=shuffle(ok).slice(0,3);if(lk.length)list.push(pick(lk));
+    ask('Подработка на вечер',`Чат «Работа ${c.name}» предлагает:`,list.map(g=>{
+      const p=Math.round(g.p*c.pay/100)*100,locked=g.need&&S[g.need]<g.min;
+      return{t:g.t,m:locked?`нужен ${g.need==='vocal'?'вокал':'удар'} ${g.min}+`:`+${fmt(p)} ₽`,dis:()=>locked,go(){
+        const e={money:p,fun:-8};for(const k in g.fx||{})e[k]=(e[k]||0)+g.fx[k];scene('work',{cap:`Милана работает: ${g.t.toLowerCase()}`},1.9,()=>say(g.note,'работа','',fx(e)))}}}),'Подработка')},
+  food(){S.money-=350;const w=S.city==='spb'?'Шаверма':'Шаурма';
+    say(pick([`${w} у вокзала. Лучшая в городе, как и все остальные.`,`${w} с двойным сыром. Жизнь налаживается.`,`Съела ${w.toLowerCase()} на ходу и ни капли соуса на кроссовках.`]),'еда','good',fx({hp:12,energy:8,booze:-1}))},
+  post(){const g=Math.round(S.content*(70+S.fame/60)*(.6+Math.random()*.8)*(.5+S.fun/100)/10)*10;
+    say(pick(['Выложила сторис. Залетело.','Скинула карусель из десяти фоток. В комментах пишут «ору».','Смонтировала рилс под свой же голос.','Сделала пост «30 дней без тормозов: день '+S.day+'».']),'сторис',g>3000?'big':'good',fx({fame:g,content:-S.content,fun:5}))},
+};
+
+function blackout(){
+  const near=ORDER.filter(k=>k!==S.city&&dist(S.city,k)<=1100);
+  const opts=[
+    ()=>{S.tattoos++;say('Провал в памяти. Утром на плече новое тату. Похоже на дельфина. Или на кабачок.','провал','bad',fx({money:-Math.min(S.money,2500),hp:-5,content:1}))},
+    ()=>say('Кто-то снял, как Милана танцует на барной стойке. Видео разлетелось по пабликам.','провал','big',fx({fame:rnd(30,70)*100,content:2})),
+    ()=>{const p=Math.min(S.money,3500);say(`Угостила шотами весь бар. Бар её любит, кошелёк нет.`,'провал','bad',fx({money:-p,fame:500}))},
+    ()=>fight(enemy('Вышибала Гена'),'Вышибала решил, что ей хватит. Милана решила, что нет.'),
+  ];
+  if(near.length)opts.push(()=>{const to=pick(near),km=dist(S.city,to);S.city=to;S.visited[to]=1;S.km+=km;S.hour+=6;
+    say(`Провал в памяти. Очнулась в поезде и вышла в незнакомом городе. Это ${CITIES[to].name}. Как сюда попала, не помнит никто.`,'провал','big',fx({energy:-25,hp:-6,content:2}))});
+  pick(opts)();
+}
+
+function sleepMenu(forced){const c=C();
+  const opts=[
+    {t:`Хостел · ${fmt(c.hostel)} ₽`,m:'+15 здоровья, нормально выспаться',dis:()=>S.money<c.hostel,go(){scene('sleep',{bed:'hostel',cap:'Милана спит в хостеле'},2.6,()=>{S.money-=c.hostel;say('Хостел, верхний ярус, беруши. Выспалась как человек.','ночлег','good',[{t:`−${fmt(c.hostel)} ₽`,c:'dn'}]);newDay({hp:15})})}},
+    {t:'Вписка у знакомых',m:S.fame>=1500?'бесплатно, как повезёт':'нужно 1 500 подписчиков',dis:()=>S.fame<1500,go(){scene('sleep',{bed:'vpiska',cap:'Милана на вписке'},2.6,()=>{const v=pick(VPISKA);say(v[0],'вписка',v[1],fx(v[2]));newDay({hp:5})})}},
+    {t:'На вокзале',m:'бесплатно, −5 здоровья, силы не до конца',go(){scene('sleep',{bed:'bench',cap:'Милана спит на вокзале'},2.6,()=>{say('Ночь на вокзале на жёсткой скамейке. Охранник будил дважды.','вокзал','bad',[]);newDay({hp:-5,cap:75})})}},
+  ];
+  if(!forced)opts.push({t:'Ещё не время',m:'вернуться к делам',go(){}});
+  ask(forced?'Милана вырубается':'Где ночевать?',`${c.name}, ${hh(S.hour)}. ${S.booze?`Градус ${S.booze}, утром будет похмелье.`:'Трезвая, утро будет добрым.'}`,opts,'Ночлег');
+}
+
+function newDay(o){
+  const h=S.booze;S.day++;S.booze=0;S.hour=9+Math.min(h,4)+rnd(0,1);
+  S.energy=Math.min(o.cap||100,100-h*10);
+  const ch=fx({hp:(o.hp||0)-h*3,fun:-6});
+  if(S.day>MAX_DAY)return ending('time');
+  let t=`Утро. День ${S.day}. `+(h>=4?'Голова как колокол, во рту пустыня. Тяжёлое похмелье.':h>=2?'Лёгкое похмелье, но жить можно.':'Проснулась бодрой.');
+  if(S.fun<20){t+=' На душе тоска, ничего не хочется.';S.energy=clamp(S.energy-10)}
+  if(S.day===MAX_DAY)t+=' Последний день тура!';
+  say(t,'утро',h>=4?'bad':'',ch);
+  if(S.hp<=0)return ending('hp');
+}
+
+// ---------- ending ----------
+function ending(kind){S.over=true;S.endKind=kind;save();render();showEnding()}
+function showEnding(){
+  const v=Object.keys(S.visited).length;let rank,desc;
+  if(S.endKind==='hp'){rank='Тур окончен досрочно';desc='Милану увезла скорая. Врачи сказали «отдыхать», мама сказала «домой». Через неделю она уже снова строила маршрут.'}
+  else if(S.fame>=100000){rank='Звезда интернета';desc='Сто тысяч человек следили, как Милана живёт на полную. Лейблы пишут в директ.'}
+  else if(v>=7){rank='Легенда трассы';desc='Объехала страну от Балтики до Тихого океана. Проводницы узнают её в лицо.'}
+  else if(S.wins>=8){rank='Гроза районов';desc='В каждом городе теперь есть кто-то, кто вздрагивает от её имени.'}
+  else if(S.songs>=10){rank='Королева караоке';desc='Микрофоны всех баров страны помнят её голос.'}
+  else if(S.money>=50000){rank='Тусовщица с бизнес-жилкой';desc='Кайфовала и ещё заработала. Редкий талант.'}
+  else if(S.drinks>=35){rank='Чемпионка барной стойки';desc='Бармены разных городов передают привет.'}
+  else{rank='Просто кайфовала';desc='Тридцать дней свободы, сотня историй и ни одного скучного вечера.'}
+  const kv=[['Дней в туре',Math.min(S.day,MAX_DAY)],['Городов',`${v} из 8`],['Километров',fmt(S.km)],['Подписчиков',fmt(S.fame)],['Драк выиграно',`${S.wins} из ${S.fights}`],['Песен спето',S.songs],['Походов в бар',S.drinks],['Татуировок',S.tattoos],['Денег осталось',fmt(S.money)+' ₽']];
+  openSheet(`<div class="kicker">Итоги тура</div><div class="ticket"><div class="rank">${rank}</div><p>${desc}</p><div class="dash" aria-hidden="true"></div><div class="kv">${kv.map(r=>`<span>${r[0]}</span><b>${r[1]}</b>`).join('')}</div></div><button type="button" class="big-btn" id="againBtn">Новый тур</button>`);
+  $('againBtn').onclick=()=>{closeSheet();reset()};
+}
+function reset(){lastSeen=0;S=fresh();intro();render();save()}
+function intro(){say('Милана, 20 лет. Сумка через плечо, 5 000 ₽ на карте и 30 дней свободы. Старт в Москве.','старт','big',[])}
+
+// ---------- render ----------
+function mood(){if(S.over)return'тур окончен';if(S.booze>=4)return'в хлам';if(S.hp<30)return'помятая';if(S.booze>=2)return'навеселе';if(S.fun>=75)return'кайфует';if(S.fun<25)return'хандрит';if(S.energy<25)return'устала';return'в норме'}
+const gbar=(l,v,c)=>`<div class="g"><div class="g-l">${l}<b>${Math.round(v)}</b></div><div class="bar"><i style="width:${v}%;--c:${c}"></i></div></div>`;
+let lastSeen=0;
+function render(){
+  const c=C();
+  $('dayLbl').textContent=`День ${Math.min(S.day,MAX_DAY)} из ${MAX_DAY}`;
+  $('routeLbl').textContent=c.route;$('cityName').textContent=c.name;$('citySub').textContent=c.sub;
+  $('moodLbl').textContent=mood();$('clockLbl').textContent=hh(S.hour);$('moneyLbl').textContent=fmt(S.money)+' ₽';
+  let segs='';for(let i=0;i<5;i++)segs+=`<i class="${i<S.booze?(S.booze>=4?'hot':'on'):''}"></i>`;
+  $('gauges').innerHTML=gbar('Здоровье',S.hp,'var(--siren)')+gbar('Силы',S.energy,'var(--mark)')+gbar('Кайф',S.fun,'var(--route)')+
+    `<div class="g"><div class="g-l">Градус<b>${S.booze}</b></div><div class="segs">${segs}</div></div>`;
+  $('nums').innerHTML=[['Подписчики',fmt(S.fame)],['Контент',`${S.content}/10`],['Вокал',S.vocal.toFixed(1)],['Удар',S.punch.toFixed(1)]].map(n=>`<div class="num"><span>${n[0]}</span><b>${n[1]}</b></div>`).join('');
+  $('actions').classList.toggle('busy',busy);$('actions').innerHTML=ACTIONS.map(a=>`<button type="button" class="act ${a.cls||''}" data-a="${a.id}" ${(!canDo(a)||S.over||busy)?'disabled':''}><span class="act-t">${a.t()}</span><span class="act-m">${a.m()}</span></button>`).join('');
+  $('tripLbl').textContent=`Города: ${Object.keys(S.visited).length} из 8 · ${fmt(S.km)} км`;
+  $('feed').innerHTML=S.feed.map(e=>`<li class="ev${e.id>lastSeen?' fresh':''}"><div class="ev-top"><span class="tag ${e.kind}">${e.tag}</span><span>д${e.d} · ${hh(e.h)} · ${CITIES[e.c].short}</span></div><p>${e.text}</p>${e.chips.length?`<div class="chips">${e.chips.map(x=>`<span class="chip ${x.c}">${x.t}</span>`).join('')}</div>`:''}</li>`).join('');
+  if(lastSeen>0&&STAGE){const nw=S.feed.filter(e=>e.id>lastSeen);const all=[].concat(...nw.slice().reverse().map(e=>e.chips));
+    if(all.length)STAGE.chips(all,STAGE.mx||STAGE.w*.42,STAGE.my||STAGE.h-110);
+    if(nw.some(e=>e.kind==='big'))STAGE.confetti(34);if(nw.some(e=>e.kind==='bad'))STAGE.shake=6}
+  lastSeen=S.seq;
+}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function load(){try{const s=JSON.parse(localStorage.getItem(KEY));return s&&s.day&&s.feed?s:null}catch(e){return null}}
+// ---------- stage: helpers ----------
+const RM=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const FONT_D='Unbounded, "Arial Black", sans-serif', FONT_M='"JetBrains Mono", ui-monospace, monospace';
+const GIRL={hair:'long',hairC:'#2b1b16',skin:'#f0c6a2',top:'#e8457c',pants:'#34518f',shoe:'#f4f1ea',crop:true};
+function srand(seed){let s=seed%2147483647||1;return()=>{s=(s*16807)%2147483647;return(s-1)/2147483646}}
+function shade(hex,k){const n=parseInt(hex.slice(1),16);return`rgb(${Math.round((n>>16)*k)},${Math.round((n>>8&255)*k)},${Math.round((n&255)*k)})`}
+function rr(c,x,y,w,h,r){c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,r);c.arcTo(x+w,y+h,x,y+h,r);c.arcTo(x,y+h,x,y,r);c.arcTo(x,y,x+w,y,r);c.closePath();c.fill()}
+function poly(c,pts){c.beginPath();c.moveTo(pts[0],pts[1]);for(let i=2;i<pts.length;i+=2)c.lineTo(pts[i],pts[i+1]);c.closePath();c.fill()}
+function skyAt(h){h=((h%24)+24)%24;
+  if(h>=6&&h<9)return{top:'#5d6aa8',bot:'#f2a07c',far:'#6b6b9a',mid:'#4a4c78',night:false,sun:'#ffb27a',sunY:.55};
+  if(h>=9&&h<17)return{top:'#5f9fdc',bot:'#cfe3f2',far:'#93a6c2',mid:'#6f84a6',night:false,sun:'#ffe48a',sunY:.2};
+  if(h>=17&&h<20.5)return{top:'#38386f',bot:'#ec8659',far:'#57466e',mid:'#3c3156',night:false,sun:'#ff9a5a',sunY:.62};
+  return{top:'#0a1130',bot:'#24325c',far:'#1b2546',mid:'#141b33',night:true};
+}
+
+// city landmarks, drawn on the far layer; g = horizon line
+const LM={
+  msk(c,x,g,col){c.fillStyle=col;
+    c.fillRect(x-14,g-58,28,58);c.fillRect(x-10,g-74,20,16);c.fillRect(x-7,g-86,14,12);poly(c,[x-8,g-86,x+8,g-86,x,g-114]);
+    c.fillRect(x-96,g-96,16,96);c.fillRect(x-78,g-122,15,122);poly(c,[x-60,g,x-60,g-84,x-46,g-94,x-46,g]);
+    c.fillStyle='#e04a3a';c.beginPath();c.arc(x,g-117,2.6,0,7);c.fill()},
+  spb(c,x,g,col){c.fillStyle=col;c.fillRect(x-44,g-24,88,24);c.fillRect(x-11,g-44,22,20);c.fillRect(x-7,g-56,14,12);
+    c.fillStyle='#d8b44a';poly(c,[x-3,g-56,x+3,g-56,x,g-112]);
+    c.fillStyle=col;poly(c,[x-150,g,x-150,g-6,x-104,g-40,x-100,g-36,x-140,g]);poly(c,[x-40,g,x-40,g-6,x-86,g-40,x-90,g-36,x-50,g])},
+  kzn(c,x,g,col){c.fillStyle=col;c.fillRect(x-12,g-30,24,30);c.fillRect(x-9,g-48,18,18);c.fillRect(x-7,g-62,14,14);c.fillRect(x-5,g-74,10,12);
+    c.fillStyle='#3c9a6a';poly(c,[x-5,g-74,x+5,g-74,x,g-102]);
+    c.fillStyle=col;c.fillRect(x+30,g-22,60,22);c.beginPath();c.ellipse(x+60,g-22,22,20,0,Math.PI,0);c.fill();
+    c.fillStyle='#3c9a6a';c.beginPath();c.ellipse(x+60,g-24,16,14,0,Math.PI,0);c.fill();
+    c.fillStyle=col;for(const m of[x+24,x+36,x+84,x+96]){c.fillRect(m-2,g-70,4,70);poly(c,[m-3,g-70,m+3,g-70,m,g-82])}},
+  sochi(c,x,g,col,sk){c.fillStyle=col;poly(c,[0,g-10,this.w*.15,g-60,this.w*.3,g-34,this.w*.48,g-78,this.w*.66,g-40,this.w,g-66,this.w,g-10]);
+    c.fillStyle=sk.night?'#1b2f55':'#2f78a6';c.fillRect(0,g-12,this.w,12);
+    for(const px of[x-30,x+40]){c.strokeStyle='#5a3d28';c.lineWidth=4;c.beginPath();c.moveTo(px,g);c.quadraticCurveTo(px+10,g-40,px+4,g-70);c.stroke();
+      c.strokeStyle='#2f7a4a';c.lineWidth=3;for(let i=0;i<5;i++){const a=-2.6+i*.55;c.beginPath();c.moveTo(px+4,g-70);c.quadraticCurveTo(px+4+Math.cos(a)*16,g-70+Math.sin(a)*16-6,px+4+Math.cos(a)*26,g-70+Math.sin(a)*26+6);c.stroke()}}},
+  ekb(c,x,g,col){c.fillStyle=col;poly(c,[x-14,g,x-14,g-120,x+14,g-132,x+14,g]);c.fillRect(x+22,g-70,20,70);c.fillRect(x-48,g-58,24,58);
+    c.fillStyle='rgba(242,194,48,.6)';c.fillRect(x-1,g-128,2,4)},
+  nsk(c,x,g,col,sk){c.fillStyle=col;c.fillRect(x-56,g-28,112,28);c.fillRect(x-30,g-44,60,16);
+    c.fillStyle=sk.night?col:'#aab6c6';c.beginPath();c.ellipse(x,g-44,32,28,0,Math.PI,0);c.fill();c.fillStyle=col;c.fillRect(x-2,g-82,4,12)},
+  vdk(c,x,g,col){c.fillStyle=col;c.beginPath();c.ellipse(x-120,g,110,52,0,Math.PI,0);c.fill();c.beginPath();c.ellipse(x+110,g,120,40,0,Math.PI,0);c.fill();
+    c.strokeStyle=col;c.lineWidth=4;for(const px of[x-48,x+48]){c.beginPath();c.moveTo(px-10,g);c.lineTo(px,g-92);c.lineTo(px+10,g);c.stroke()}
+    c.lineWidth=3;c.beginPath();c.moveTo(x-110,g-24);c.lineTo(x+110,g-24);c.stroke();
+    c.lineWidth=1;for(const px of[x-48,x+48])for(let i=1;i<=5;i++){c.beginPath();c.moveTo(px,g-90);c.lineTo(px-i*12,g-24);c.moveTo(px,g-90);c.lineTo(px+i*12,g-24);c.stroke()}},
+  kgd(c,x,g,col,sk){c.fillStyle=sk.night?'#1b2f55':'#3f7fa8';c.fillRect(0,g-10,this.w,10);
+    c.fillStyle=col;c.fillRect(x-34,g-36,68,36);poly(c,[x-34,g-36,x+34,g-36,x,g-52]);c.fillRect(x-9,g-80,18,44);poly(c,[x-10,g-80,x+10,g-80,x,g-106]);
+    c.fillRect(x+78,g-62,10,62);c.fillStyle='#d9403f';c.fillRect(x+76,g-70,14,8)},
+};
+
+// figure: P = pose, L = look. angles from straight-down, positive = towards facing side
+function person(c,x,gy,s,P,L){
+  const f=P.f||1;c.save();c.translate(x,gy-(P.bob||0));
+  c.rotate(P.lie?-Math.PI/2*f*P.lie:(P.lean||0)*f);
+  const hipY=-34*s,shY=-58*s,hY=-68*s,LL=33*s,AL=23*s;
+  const seg=(x0,y0,a,len,w,col)=>{const x1=x0+Math.sin(a)*len*f,y1=y0+Math.cos(a)*len;c.strokeStyle=col;c.lineWidth=w;c.lineCap='round';c.beginPath();c.moveTo(x0,y0);c.lineTo(x1,y1);c.stroke();return[x1,y1]};
+  const shoe=p=>{c.fillStyle=L.shoe;c.beginPath();c.ellipse(p[0]+2.5*f*s,p[1],5*s,3*s,0,0,7);c.fill()};
+  const skin=P.hurt?'#f0908a':L.skin;
+  if(L.hair==='long'){c.fillStyle=L.hairC;c.beginPath();c.ellipse(-2.5*f*s,hY+9*s,8*s,15*s,0,0,7);c.fill()}
+  shoe(seg(-1.5*f*s,hipY,P.lr||0,LL,7*s,shade(L.pants,.75)));
+  seg(-1*f*s,shY+3*s,P.ar||0,AL,5*s,shade(skin.startsWith('#')?skin:'#f0c6a2',.85));
+  c.fillStyle=skin;c.fillRect(-6*s,shY+10*s,12*s,hipY-shY-10*s);
+  c.fillStyle=L.top;rr(c,-7.5*s,shY,15*s,L.crop?13*s:(hipY-shY+2*s),4*s);
+  c.fillStyle=L.pants;rr(c,-7*s,hipY-5*s,14*s,8*s,2*s);
+  const fl=seg(1.5*f*s,hipY,P.ll||0,LL,7*s,L.pants);
+  if(L.stripes){c.strokeStyle='rgba(255,255,255,.7)';c.lineWidth=1.2*s;c.beginPath();c.moveTo(1.5*f*s,hipY);c.lineTo(fl[0],fl[1]-2*s);c.stroke()}
+  shoe(fl);
+  c.fillStyle=skin;c.fillRect(-2*s,hY+5*s,4*s,5*s);c.beginPath();c.arc(0,hY,7.5*s,0,7);c.fill();
+  if(L.hair==='long'){c.fillStyle=L.hairC;c.beginPath();c.arc(0,hY-1*s,8*s,Math.PI,0);c.fill();c.fillRect(-8.5*f*s-(f<0?-0:0),hY-1*s,4*s*f,10*s)}
+  else if(L.hair==='short'){c.fillStyle=L.hairC;c.beginPath();c.arc(0,hY-1.5*s,7.8*s,Math.PI,0);c.fill()}
+  else if(L.hair==='cap'){c.fillStyle=L.cap||'#1d1f24';c.beginPath();c.arc(0,hY-1.5*s,8*s,Math.PI,0);c.fill();c.fillRect(0,hY-3*s,10*s*f,3*s)}
+  if(P.ko){c.strokeStyle='#1a1410';c.lineWidth=1.2*s;const ex=3.2*f*s,ey=hY;c.beginPath();c.moveTo(ex-1.6*s,ey-1.6*s);c.lineTo(ex+1.6*s,ey+1.6*s);c.moveTo(ex+1.6*s,ey-1.6*s);c.lineTo(ex-1.6*s,ey+1.6*s);c.stroke()}
+  else if(P.sleep){c.strokeStyle='#1a1410';c.lineWidth=1.1*s;c.beginPath();c.moveTo(2*f*s,hY+.5*s);c.lineTo(4.6*f*s,hY+.5*s);c.stroke()}
+  else{c.fillStyle='#1a1410';c.beginPath();c.arc(3.2*f*s,hY+.5*s,1.15*s,0,7);c.fill()}
+  if(P.blush){c.fillStyle='rgba(230,80,100,.6)';c.beginPath();c.arc(3*f*s,hY+3.6*s,1.9*s,0,7);c.fill()}
+  if(P.mouth){c.fillStyle='#5a1f22';c.beginPath();c.ellipse(4.8*f*s,hY+4.2*s,1.4*s,Math.max(.4,P.mouth*2.2)*s,0,0,7);c.fill()}
+  if(P.bandage){c.strokeStyle='#f4f1ea';c.lineWidth=2.2*s;c.beginPath();c.moveTo(-7*s,hY-2*s);c.lineTo(7*s,hY-4.5*s);c.stroke()}
+  const hd=seg(1*f*s,shY+3*s,P.al||0,AL,5*s,skin);
+  if(L.tat){c.fillStyle='rgba(30,30,40,.75)';const m=[(1*f*s+hd[0])/2,(shY+3*s+hd[1])/2];c.beginPath();c.arc(m[0],m[1],1.6*s,0,7);c.fill()}
+  c.fillStyle=L.top;c.beginPath();c.arc(1*f*s,shY+3.5*s,3.4*s,0,7);c.fill();
+  if(P.prop)prop(c,P.prop,hd[0],hd[1],s,f);
+  c.restore();
+}
+function prop(c,k,x,y,s,f){
+  c.save();c.translate(x,y);
+  if(k==='mic'){c.rotate(-.5*f);c.fillStyle='#22252b';c.fillRect(-1.5*s,-1*s,3*s,9*s);c.fillStyle='#9aa3ae';c.beginPath();c.arc(0,-2.5*s,3.2*s,0,7);c.fill()}
+  else if(k==='phone'){c.fillStyle='#15181d';rr(c,-3.2*s,-10*s,6.4*s,11*s,1.5*s);c.fillStyle='#8fd0ff';c.fillRect(-2.2*s,-9*s,4.4*s,8.4*s)}
+  else if(k==='glass'){c.fillStyle='rgba(242,194,48,.9)';poly(c,[-5*s,-12*s,5*s,-12*s,0,-5*s]);c.strokeStyle='rgba(255,255,255,.85)';c.lineWidth=1.1;c.beginPath();c.moveTo(-6*s,-13*s);c.lineTo(6*s,-13*s);c.lineTo(0,-5*s);c.closePath();c.moveTo(0,-5*s);c.lineTo(0,1*s);c.moveTo(-3*s,1*s);c.lineTo(3*s,1*s);c.stroke()}
+  else if(k==='roll'){c.rotate(-.9*f);c.fillStyle='#e9d3a6';rr(c,-3.2*s,-11*s,6.4*s,14*s,3*s);c.fillStyle='#c94a3a';c.fillRect(-2.6*s,-11*s,5.2*s,2.4*s);c.fillStyle='#4d8a3a';c.fillRect(-2.6*s,-8.6*s,5.2*s,1.4*s)}
+  else if(k==='box'){c.fillStyle='#b58a52';c.fillRect(-7*s,-12*s,14*s,11*s);c.fillStyle='#8a6638';c.fillRect(-7*s,-8*s,14*s,2*s)}
+  c.restore();
+}
+
+// ---------- stage: core ----------
+class Stage{
+  constructor(cv,kind){this.cv=cv;this.c=cv.getContext('2d');this.kind=kind||'main';this.parts=[];this.anim=null;this.t=0;this.dt=0;this.scroll=0;this.shake=0;this.flash=0;this.last=0;this.tiles={};
+    const r=srand(7);this.stars=Array.from({length:40},()=>[r(),r()*.6,r()*6]);
+    this.fit();try{this.ro=new ResizeObserver(()=>this.fit());this.ro.observe(cv)}catch(e){}
+    this.loop=this.loop.bind(this);requestAnimationFrame(this.loop)}
+  fit(){const r=this.cv.getBoundingClientRect(),d=Math.min(2,window.devicePixelRatio||1);this.w=Math.max(10,r.width);this.h=Math.max(10,r.height);
+    this.cv.width=Math.round(this.w*d);this.cv.height=Math.round(this.h*d);this.c.setTransform(d,0,0,d,0,0)}
+  play(name,o,dur,cb){this.anim={name,o:o||{},t:0,dur:RM?Math.min(dur,.45):dur,cb,k:{}}}
+  once(key){const a=this.anim;if(!a||a.k[key])return false;a.k[key]=1;return true}
+  every(key,per){const a=this.anim;if(!a)return false;const n=Math.floor(a.t/per);if(a.k[key]===n)return false;a.k[key]=n;return true}
+  loop(ts){if(!this.cv.isConnected){if(this.ro)this.ro.disconnect();return}
+    this.dt=Math.min(.05,this.last?(ts-this.last)/1000:0);this.last=ts;this.t+=this.dt;
+    if(this.anim){this.anim.t+=this.dt;if(this.anim.t>=this.anim.dur){const cb=this.anim.cb;this.anim=null;if(cb)cb()}}
+    const c=this.c;c.save();c.clearRect(0,0,this.w,this.h);
+    if(this.shake>0&&!RM){c.translate((Math.random()-.5)*this.shake,(Math.random()-.5)*this.shake);this.shake*=.86;if(this.shake<.4)this.shake=0}
+    try{this.kind==='fight'?this.drawFight():this.kind==='karaoke'?this.drawKaraoke():this.drawMain()}catch(e){console.error(e)}
+    this.drawParts();
+    if(this.flash>0){c.fillStyle=`rgba(255,255,255,${this.flash})`;c.fillRect(-10,-10,this.w+20,this.h+20);this.flash=Math.max(0,this.flash-this.dt*2.6)}
+    c.restore();requestAnimationFrame(this.loop)}
+  spawn(o){this.parts.push(Object.assign({x:0,y:0,vx:0,vy:-30,g:0,life:1.4,age:0,size:14,col:'#ece6d6',txt:'',type:'txt',rot:0,vr:0,delay:0,font:FONT_D,w:700},o))}
+  drawParts(){const c=this.c,dt=this.dt;
+    this.parts=this.parts.filter(p=>{p.age+=dt;if(p.age<p.delay)return true;const a=p.age-p.delay;if(a>p.life)return false;
+      p.vy+=p.g*dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.rot+=p.vr*dt;const al=Math.min(1,(p.life-a)/(p.life*.35));
+      c.save();c.globalAlpha=Math.max(0,al);c.translate(p.x,p.y);c.rotate(p.rot);
+      if(p.type==='conf'){c.fillStyle=p.col;c.fillRect(-2,-3.5,4,7)}
+      else if(p.type==='burst'){const k=Math.min(1,a*9),r=p.size*1.25*k;c.fillStyle=p.col;c.beginPath();for(let i=0;i<20;i++){const rad=i%2?r*.62:r,ang=i/20*Math.PI*2;c.lineTo(Math.cos(ang)*rad*1.35,Math.sin(ang)*rad)}c.closePath();c.fill();c.strokeStyle='#14171c';c.lineWidth=2;c.stroke();
+        c.fillStyle='#14171c';c.font=`700 ${Math.round(p.size*.62*k)+1}px ${FONT_D}`;c.textAlign='center';c.textBaseline='middle';c.fillText(p.txt,0,1)}
+      else{c.font=`${p.w} ${p.size}px ${p.font}`;c.textAlign='center';c.textBaseline='middle';c.lineJoin='round';c.strokeStyle='rgba(12,14,18,.85)';c.lineWidth=3;c.strokeText(p.txt,0,0);c.fillStyle=p.col;c.fillText(p.txt,0,0)}
+      c.restore();return true})}
+  chips(list,x,y){list.slice(0,6).forEach((ch,i)=>this.spawn({txt:ch.t,x:x+(i%2?22:-22),y:y-Math.floor(i/2)*15,vy:-24,life:2.1,delay:i*.14,size:12,font:FONT_M,w:600,col:ch.c==='up'?'#9fe0b6':ch.c==='dn'?'#f3a9a8':'#ece6d6'}))}
+  confetti(n){const cols=['#f2c230','#e8457c','#2b8b53','#8fd0ff','#ece6d6'];for(let i=0;i<n;i++)this.spawn({type:'conf',x:Math.random()*this.w,y:-10-Math.random()*40,vx:(Math.random()-.5)*60,vy:40+Math.random()*60,g:30,vr:(Math.random()-.5)*10,life:2.4,col:cols[i%cols.length]})}
+  burst(txt,x,y,col,size){this.spawn({type:'burst',txt,x,y,vy:-8,life:.75,size:size||20,col:col||'#f2c230'})}
+  float(txt,x,y,col,size,o){this.spawn(Object.assign({txt,x,y,col:col||'#ece6d6',size:size||16},o||{}))}
+}
+// ---------- stage: poses & scenes ----------
+const sway=t=>S.booze>=3?Math.sin(t*1.7)*(.05+S.booze*.02):0;
+const lookM=()=>Object.assign({},GIRL,{tat:S.tattoos>0});
+const idleP=t=>({ll:.06,lr:-.06,al:.15+Math.sin(t*2)*.05,ar:-.12,bob:Math.sin(t*2)*.6,lean:sway(t),blush:S.booze>=2,bandage:S.hp<35});
+const walkP=(t,sp)=>{const ph=t*(sp||7);return{ll:Math.sin(ph)*.55,lr:-Math.sin(ph)*.55,al:-Math.sin(ph)*.45,ar:Math.sin(ph)*.45,bob:Math.abs(Math.sin(ph))*2.5,lean:sway(t),blush:S.booze>=2,bandage:S.hp<35}};
+const danceP=t=>{const ph=t*8;return{al:2.3+Math.sin(ph)*.45,ar:2.6+Math.cos(ph)*.4,ll:Math.sin(ph)*.25,lr:-Math.sin(ph)*.25,bob:Math.abs(Math.sin(ph))*4,lean:Math.sin(ph*.5)*(.08+S.booze*.03),blush:S.booze>=1,mouth:.5,prop:'glass'}};
+function enemyLook(n){const h=[...n].reduce((a,ch)=>a+ch.charCodeAt(0),0);
+  if(/девушк/i.test(n))return{hair:'long',hairC:'#c9a04a',skin:'#efc4a0',top:'#7a3fb0',pants:'#24262c',shoe:'#e8e2d6',crop:true};
+  if(/Гопник/.test(n))return{hair:'cap',cap:'#1d1f24',hairC:'#3a2a20',skin:'#e8bd98',top:'#1f2228',pants:'#1f2228',shoe:'#e8e2d6',stripes:true};
+  const tops=['#5a6b3a','#7a2f2f','#2f4f7a','#4a3a2a','#3a3f48'];
+  return{hair:['short','cap','bald'][h%3],cap:'#2a2d33',hairC:'#3a2a20',skin:'#e6b892',top:tops[h%tops.length],pants:'#2a2d33',shoe:'#d0d0d0'}}
+
+Object.assign(Stage.prototype,{
+  street(hour,lowGround){const c=this.c,w=this.w,h=this.h,g=h-46,sk=skyAt(hour);
+    let gr=c.createLinearGradient(0,0,0,g);gr.addColorStop(0,sk.top);gr.addColorStop(1,sk.bot);c.fillStyle=gr;c.fillRect(0,0,w,g+2);
+    if(sk.night){for(const s of this.stars){c.fillStyle=`rgba(255,250,230,${.35+.35*Math.sin(this.t*2+s[2])})`;c.fillRect(s[0]*w,s[1]*g,1.6,1.6)}
+      c.fillStyle='#f4ecd0';c.beginPath();c.arc(w*.86,h*.2,11,0,7);c.fill();c.fillStyle=sk.top;c.beginPath();c.arc(w*.86+5,h*.2-3,10,0,7);c.fill()}
+    else{c.fillStyle=sk.sun;c.beginPath();c.arc(w*.86,g*sk.sunY+8,13,0,7);c.fill()}
+    LM[S.city].call(this,c,w*.72,g,sk.far,sk);
+    const key=S.city;if(!this.tiles[key]){const r=srand(key.charCodeAt(0)*97+key.length*13),arr=[];let x=0;
+      while(x<600){const bw=26+r()*40,bh=16+r()*(S.city==='sochi'||S.city==='kgd'?22:46);arr.push({x,w:bw,h:bh,win:Array.from({length:24},()=>r()>.55)});x+=bw+4+r()*16}this.tiles[key]=arr}
+    const off=-((this.scroll*.3)%600);
+    for(let k=-1;k*600+off<w;k++)for(const b of this.tiles[key]){const bx=off+k*600+b.x;if(bx>w||bx+b.w<0)continue;
+      c.fillStyle=sk.mid;c.fillRect(bx,g-b.h,b.w,b.h);
+      if(sk.night){c.fillStyle='rgba(242,194,48,.75)';let i=0;for(let yy=g-b.h+5;yy<g-6;yy+=8)for(let xx=bx+4;xx<bx+b.w-5;xx+=7){if(b.win[i++%24])c.fillRect(xx,yy,3,4)}}}
+    if(lowGround)return;
+    c.fillStyle='#3b4049';c.fillRect(0,g,w,16);c.fillStyle='#52586266';c.fillRect(0,g,w,2);
+    c.fillStyle='#24282f';c.fillRect(0,g+16,w,h-g-16);
+    c.fillStyle='#f2c230';const d=-(this.scroll%44);for(let x=d;x<w;x+=44)c.fillRect(x,g+29,24,3);
+    const lo=-(this.scroll%220);for(let x=lo+60;x<w+20;x+=220){c.strokeStyle='#59606c';c.lineWidth=2;c.beginPath();c.moveTo(x,g+6);c.lineTo(x,g-56);c.lineTo(x+10,g-56);c.stroke();
+      if(sk.night){const rg=c.createRadialGradient(x+10,g-54,1,x+10,g-54,40);rg.addColorStop(0,'rgba(255,214,120,.55)');rg.addColorStop(1,'rgba(255,214,120,0)');c.fillStyle=rg;c.fillRect(x-30,g-94,80,80)}
+      c.fillStyle=sk.night?'#ffd678':'#8a919c';c.fillRect(x+6,g-55,9,3)}
+  },
+  room(hour,bed){const c=this.c,w=this.w,h=this.h,sk=skyAt(hour);
+    c.fillStyle='#2a2f3d';c.fillRect(0,0,w,h);c.fillStyle='#232733';c.fillRect(0,h-26,w,26);
+    const wx=w*.62,wy=h*.14,ww=Math.min(120,w*.28),wh=h*.42,gr=c.createLinearGradient(0,wy,0,wy+wh);gr.addColorStop(0,sk.top);gr.addColorStop(1,sk.bot);
+    c.fillStyle=gr;c.fillRect(wx,wy,ww,wh);if(!sk.night){c.fillStyle=sk.sun;c.beginPath();c.arc(wx+ww*.7,wy+wh*.6,9,0,7);c.fill()}else{c.fillStyle='#f4ecd0';c.beginPath();c.arc(wx+ww*.7,wy+wh*.35,7,0,7);c.fill()}
+    c.fillStyle='#4a4f5e';c.fillRect(wx-3,wy-3,ww+6,3);c.fillRect(wx-3,wy+wh,ww+6,3);c.fillRect(wx-3,wy,3,wh);c.fillRect(wx+ww,wy,3,wh);c.fillRect(wx+ww/2-1,wy,2,wh);
+    if(bed==='vpiska'){c.fillStyle='#e8457c55';c.fillRect(w*.08,h*.1,26,36);c.fillStyle='#8fd0ff44';c.fillRect(w*.08+32,h*.16,30,22)}
+  },
+  drawMain(){const a=this.anim,name=a?a.name:'idle',p=a?a.t/a.dur:0,c=this.c,w=this.w,h=this.h,g=h-46,gy=g+12,mx=w*.42,t=this.t,o=a?a.o:{};
+    const sp={walk:70,work:130,train:240,hitch:p>.6?(p-.6)*500:0}[name]||0;this.scroll+=sp*this.dt;this.mx=mx;this.my=gy-78;
+    if(name==='bar')return this.bar(p);
+    if(name==='sleep'){const hr=p<.5?1.5:p<.62?6.5:8.5;
+      if(o.bed==='bench'){this.street(hr);c.fillStyle='#6b4a32';c.fillRect(mx-46,gy-14,70,5);c.fillRect(mx-46,gy-24,70,4);c.fillStyle='#3a3f48';c.fillRect(mx-42,gy-10,4,10);c.fillRect(mx+16,gy-10,4,10)}
+      else{this.room(hr,o.bed);c.fillStyle='#5a4a3a';c.fillRect(mx-56,h-46,92,22);c.fillStyle='#e9e4da';c.fillRect(mx-54,h-52,88,8);c.fillStyle='#f4f1ea';rr(c,mx-56,h-58,18,8,3)}
+      const by=o.bed==='bench'?gy-15:h-52;
+      if(p<.8){person(c,mx+30,by,1,{lie:1,sleep:1,al:.2,ar:.1,ll:0,lr:0},lookM());
+        c.fillStyle=o.bed==='bench'?'#7a6a52':'#2b8b53';rr(c,mx-34,by-14,62,14,5);
+        if(this.every('z',.45))this.float('z',mx-30,by-26,'#ece6d6',10+Math.random()*6,{vx:10,vy:-22,life:1.3})}
+      else person(c,mx,o.bed==='bench'?gy:h-24,1,{al:3.0,ar:3.0,ll:.08,lr:-.08,mouth:.6},lookM());
+      return}
+    if(name==='plane'){this.street(S.hour%24,false);
+      for(let i=0;i<4;i++){const cx=((i*170-t*40)%(w+160)+w+160)%(w+160)-80;c.fillStyle='rgba(255,255,255,.55)';c.beginPath();c.ellipse(cx,30+i*14,30,9,0,0,7);c.fill()}
+      const px=-60+p*(w+140),py=h*.62-p*h*.5;c.strokeStyle='rgba(255,255,255,.6)';c.lineWidth=2;c.setLineDash([6,5]);c.beginPath();c.moveTo(px-20,py+6);c.lineTo(px-20-p*w,py+6+p*h*.5);c.stroke();c.setLineDash([]);
+      c.save();c.translate(px,py);c.rotate(-.35);c.fillStyle='#f4f1ea';rr(c,-26,-5,52,10,5);c.fillStyle='#1c4ea0';poly(c,[-4,0,8,0,-6,14]);poly(c,[-4,0,8,0,-6,-12]);poly(c,[-26,-5,-18,-5,-28,-15]);
+      c.fillStyle='#8fd0ff';for(let i=0;i<5;i++)c.fillRect(-12+i*6,-3,3,3);c.restore();return}
+    this.street(S.hour%24);
+    if(name==='train'){const ry=h-18;c.fillStyle='#4a3a2a';for(let x=-(this.scroll%16);x<w;x+=16)c.fillRect(x,ry,8,4);c.fillStyle='#9aa3ae';c.fillRect(0,ry-1,w,2);
+      const tx=-500+p*(w+560);for(let i=0;i<4;i++){const cx=tx+i*124;c.fillStyle='#3d6b5a';rr(c,cx,ry-40,118,36,i===3?14:4);c.fillStyle='#f2c230';c.fillRect(cx,ry-17,118,3);
+        c.fillStyle='#cfe3f2';for(let j=0;j<6;j++)c.fillRect(cx+8+j*18,ry-34,11,10);c.fillStyle='#1d1f24';c.beginPath();c.arc(cx+20,ry-3,5,0,7);c.arc(cx+98,ry-3,5,0,7);c.fill()}
+      c.fillStyle='#e8457c';c.beginPath();c.arc(tx+124+8+2*18+5,ry-29,3.5,0,7);c.fill();c.fillStyle='#2b1b16';c.beginPath();c.arc(tx+124+8+2*18+5,ry-31,3.6,Math.PI,0);c.fill();return}
+    if(name==='hitch'){const k=p<.4?1-Math.pow(1-p/.4,2):1,cx=p<.6?-110+k*(mx-60+110):mx-60+Math.pow((p-.6)/.4,2)*(w+120);
+      if(p<.52)person(c,mx+30,gy,1,{al:1.75,ar:-.1,ll:.06,lr:-.06,bob:0,mouth:p>.4?.4:0,f:-1},lookM());
+      const cy=gy+10;c.fillStyle='#c9c3b5';rr(c,cx,cy-24,96,18,5);rr(c,cx+22,cy-38,48,16,6);c.fillStyle='#8fd0ff';c.fillRect(cx+28,cy-35,16,10);c.fillRect(cx+48,cy-35,16,10);
+      c.fillStyle='#1d1f24';c.beginPath();c.arc(cx+22,cy-5,8,0,7);c.arc(cx+76,cy-5,8,0,7);c.fill();c.fillStyle='#f2c230';c.fillRect(cx+92,cy-20,4,4);
+      if(p>.52&&p<.6&&this.once('in'))this.float('поехали!',mx,gy-60,'#f2c230',13);return}
+    const L=lookM();
+    if(name==='walk')person(c,mx,gy,1,walkP(t),L);
+    else if(name==='work'){const P=walkP(t,11);P.al=1.45;P.prop='box';person(c,mx,gy,1,P,L);
+      if(p>.82&&this.once('c'))for(let i=0;i<7;i++)this.float('₽',mx+(Math.random()-.5)*40,gy-40,'#f2c230',16,{vy:-60-Math.random()*40,vx:(Math.random()-.5)*50,g:90,life:1})}
+    else if(name==='food'){const P=idleP(t);P.al=2.35+Math.max(0,Math.sin(t*5))*.35;P.prop='roll';P.mouth=Math.max(0,Math.sin(t*5))*.5;person(c,mx,gy,1,P,L);
+      if(this.every('h',.4))this.float('♥',mx+(Math.random()-.5)*30,gy-80,'#e8457c',14,{vy:-30,life:1.1})}
+    else if(name==='post'){const P=idleP(t);P.al=2.05;P.prop='phone';P.mouth=.35;P.lean=-.05;person(c,mx,gy,1,P,L);
+      if(p>.35&&this.once('f'))this.flash=.75;
+      if(p>.4&&this.every('l',.12))this.float(Math.random()>.4?'♥':'+1',mx+(Math.random()-.5)*80,gy-70,Math.random()>.5?'#e8457c':'#ece6d6',12+Math.random()*8,{vy:-40-Math.random()*20,life:1.2})}
+    else person(c,mx,gy,1,idleP(t),L);
+  },
+  bar(p){const c=this.c,w=this.w,h=this.h,t=this.t,gy=h-22,mx=w*.32;
+    c.fillStyle='#1c1426';c.fillRect(0,0,w,h);
+    const cols=['232,69,124','242,194,48','43,139,83','143,208,255'];
+    for(let i=0;i<4;i++){const x=(Math.sin(t*(.7+i*.3)+i)*.5+.5)*w,y=h*.4+Math.cos(t*(.9+i*.2)+i*2)*h*.28,rg=c.createRadialGradient(x,y,2,x,y,70);rg.addColorStop(0,`rgba(${cols[i]},.28)`);rg.addColorStop(1,`rgba(${cols[i]},0)`);c.fillStyle=rg;c.fillRect(x-70,y-70,140,140)}
+    c.fillStyle='#2b2236';c.fillRect(w*.55,h*.2,w*.42,4);c.fillRect(w*.55,h*.44,w*.42,4);
+    const r=srand(11);for(const sy of[h*.2,h*.44])for(let x=w*.57;x<w*.95;x+=13){const bh=12+r()*10;c.fillStyle=['#3c7a4a','#7a4a2a','#cfe3f2','#a33'][Math.floor(r()*4)];c.fillRect(x,sy-bh,7,bh);c.fillRect(x+2,sy-bh-4,3,4)}
+    const on=p<.08||Math.sin(t*11)>-.8;c.save();c.font=`700 26px ${FONT_D}`;c.textBaseline='middle';c.shadowColor='#f2c230';c.shadowBlur=on?16:0;c.fillStyle=on?'#f2c230':'#5a4a1a';c.fillText('БАР',w*.08,h*.26);c.restore();
+    c.fillStyle='#4a2f22';c.fillRect(w*.5,h-56,w*.5,56);c.fillStyle='#6b4430';c.fillRect(w*.48,h-60,w*.52,6);
+    c.fillStyle='#120d18';c.fillRect(0,h-22,w*.5,22);
+    person(c,mx,gy,1,danceP(t),lookM());this.mx=mx;this.my=gy-78;
+    if(this.every('n',.42))this.float(Math.random()>.5?'♪':'♫',mx+(Math.random()-.3)*60,gy-90,Math.random()>.5?'#f2c230':'#e8457c',16,{vy:-26,vx:(Math.random()-.5)*20,life:1.3});
+    if(p>.5&&this.once('clink'))this.burst('ДЗЫНЬ',mx+30,gy-96,'#ece6d6',16);
+  },
+
+  // ----- fight -----
+  fightInit(look,scale){this.F={T:9,p:null,e:null,hitP:0,hitE:0,res:null,rt:0,look,scale:scale||1}},
+  fightAct(p,e,hitP,hitE){Object.assign(this.F,{T:0,p,e,hitP,hitE,fired:false})},
+  fightEnd(res){this.F.res=res;this.F.rt=0},
+  drawFight(){const c=this.c,w=this.w,h=this.h,gy=h-16,F=this.F,t=this.t;if(!F)return;F.T+=this.dt;F.rt+=this.dt;
+    c.fillStyle='#2a2328';c.fillRect(0,0,w,h);c.strokeStyle='rgba(0,0,0,.28)';c.lineWidth=1;
+    for(let y=0,row=0;y<h-16;y+=12,row++){c.beginPath();c.moveTo(0,y);c.lineTo(w,y);c.stroke();for(let x=(row%2)*14;x<w;x+=28){c.beginPath();c.moveTo(x,y);c.lineTo(x,y+12);c.stroke()}}
+    const rg=c.createRadialGradient(w/2,0,4,w/2,0,h*1.1);rg.addColorStop(0,'rgba(255,214,120,.32)');rg.addColorStop(1,'rgba(255,214,120,0)');c.fillStyle=rg;c.fillRect(0,0,w,h);
+    c.fillStyle='#d9403f';c.font=`700 15px ${FONT_D}`;c.globalAlpha=.35;c.fillText('ЦОЙ ЖИВ',w*.06,h*.3);c.globalAlpha=1;
+    c.fillStyle='#1d1f24';c.fillRect(0,gy,w,16);
+    const T=F.T,k=T<.22?T/.22:Math.max(0,1-(T-.22)/.38),act=T<.6;
+    const stance=ph=>({al:2.05+Math.sin(ph)*.12,ar:2.35,ll:.28,lr:-.22,bob:Math.abs(Math.sin(ph))*2});
+    let mx=w*.34,ex=w*.66;const P=stance(t*6),E=stance(t*6+1);P.blush=S.booze>=2;P.bandage=S.hp<35;
+    const apply=(Q,mv,dir)=>{let dx=0;if(mv==='atk'){Q.al=2.05+(1.57-2.05)*k;Q.lean=.14*k;dx=16*k}else if(mv==='blk'){Q.al=2.8;Q.ar=2.95}else if(mv==='dge'){Q.lean=-.38*k;dx=-12*k;Q.bob=-4*k}return dx*dir};
+    if(act&&!F.res){mx+=apply(P,F.p,1);ex+=apply(E,F.e,-1);
+      const hk=T>.22?Math.max(0,1-(T-.22)/.4):0;if(F.hitP&&hk){P.lean=-.25*hk;mx-=8*hk;P.hurt=1}if(F.hitE&&hk){E.lean=-.25*hk;ex+=8*hk;E.hurt=1}
+      if(T>.22&&!F.fired){F.fired=true;const s=F.scale;
+        if(F.hitE){this.burst(pick(['БАМ!','ХРЯСЬ!','БУМ!','ТЫЩ!']),ex,gy-80*s,'#f2c230',22);this.shake=8}
+        if(F.hitP){this.burst(pick(['ОЙ!','АУ!','БАЦ!']),mx,gy-80,'#f3a9a8',18);this.shake=Math.max(this.shake,6)}
+        if(F.p==='blk'&&F.e==='atk')this.burst('БЛОК',mx+10,gy-70,'#9aa3ae',14);
+        if(F.p==='dge'&&F.e==='atk'&&!F.hitP)this.float('ВЖУХ',mx-6,gy-86,'#8fd0ff',14,{vy:-20,life:.9});
+        if(F.p==='atk'&&F.e==='dge')this.float('МИМО',ex,gy-90,'#ece6d6',14,{vy:-20,life:.9});
+        if(!F.hitP&&!F.hitE&&F.p!=='atk'&&F.e!=='atk')this.float('…',w/2,gy-70,'#9aa3ae',18,{vy:-14,life:.9})}}
+    if(F.res==='win'){Object.assign(E,{lie:Math.min(1,F.rt*3),ko:1});const j=Math.abs(Math.sin(t*6));Object.assign(P,{al:2.9+Math.sin(t*8)*.15,ar:2.9-Math.sin(t*8)*.15,bob:j*6,mouth:.7});
+      const sn=Math.floor(F.rt/.5);if(F.rt>.3&&F.sn!==sn){F.sn=sn;this.float('★',ex-30,gy-24,'#f2c230',12,{vy:-10,vx:20,life:.9})}}
+    if(F.res==='lose'){Object.assign(P,{lie:Math.min(1,F.rt*3),ko:1});Object.assign(E,{al:2.9,ar:2.9,bob:Math.abs(Math.sin(t*6))*4})}
+    if(F.res==='run'){mx-=F.rt*160;Object.assign(P,walkP(t,12),{f:-1})}
+    person(c,ex,gy,F.scale,Object.assign(E,{f:-1}),F.look);
+    person(c,mx,gy,1,P,lookM());
+  },
+
+  // ----- karaoke -----
+  karaokeInit(venue){this.K={venue,crowd:.3,cheer:0,coins:0}},
+  note(s){const K=this.K,mx=this.w/2,my=this.h-96;
+    if(s===2){for(let i=0;i<3;i++)this.float(i%2?'♫':'♪',mx+10,my,i%2?'#2b8b53':'#f2c230',18,{vx:(i-1)*40,vy:-50,life:1.2,delay:i*.08});this.burst('ЧИСТО!',mx+60,my-16,'#2b8b53',16);K.crowd=1;K.cheer=1.4;if(K.venue==='street')K.coins+=2}
+    else if(s===1){this.float('♪',mx+10,my,'#f2c230',18,{vx:20,vy:-45,life:1.1});K.crowd=.7;K.cheer=.5;if(K.venue==='street')K.coins++}
+    else{this.float('фальшь',mx+40,my,'#f3a9a8',14,{vy:-22,life:1.1});this.shake=4;K.crowd=.08}},
+  karaokeEnd(sc){if(sc>=7){this.confetti(46);this.K.cheer=3}else if(sc<4)this.float('…',this.w/2,this.h-110,'#9aa3ae',22,{vy:-10})},
+  drawKaraoke(){const c=this.c,w=this.w,h=this.h,K=this.K,t=this.t,mx=w/2;if(!K)return;
+    if(K.venue==='street')this.street(22)
+    else{c.fillStyle='#1a1430';c.fillRect(0,0,w,h);c.fillStyle='#2a2240';c.fillRect(0,h-34,w,34);
+      c.fillStyle='rgba(255,236,190,.14)';poly(c,[mx-18,0,mx+18,0,mx+80,h-30,mx-80,h-30]);
+      c.save();c.font=`700 13px ${FONT_D}`;c.fillStyle='#e8457c';c.shadowColor='#e8457c';c.shadowBlur=10;c.fillText('КАРАОКЕ',12,22);c.restore()}
+    const gy=h-30;
+    if(K.venue==='street'){c.fillStyle='#1d1f24';c.beginPath();c.ellipse(mx+52,gy-2,15,5,0,0,7);c.fill();c.fillRect(mx+44,gy-12,16,10);
+      c.fillStyle='#f2c230';for(let i=0;i<Math.min(K.coins,10);i++)c.fillRect(mx+40+(i%5)*5,gy-6-Math.floor(i/5)*2,4,2)}
+    person(c,mx,gy,1,{al:2.75,ar:1.5+Math.sin(t*3)*.6,ll:.1,lr:-.1,bob:Math.sin(t*4)*1.5,mouth:.4+.5*Math.abs(Math.sin(t*9)),prop:'mic',blush:S.booze>=2,lean:sway(t)},lookM());
+    K.crowd+=(.3-K.crowd)*this.dt*.8;K.cheer=Math.max(0,K.cheer-this.dt);
+    const n=Math.max(6,Math.round(w/44));
+    for(let i=0;i<n;i++){const x=(i+.5)*w/n,b=K.crowd*7*Math.abs(Math.sin(t*7+i*1.3)),y=h+4-b;
+      c.fillStyle=K.venue==='street'?'#0f131b':'#0d0a16';c.beginPath();c.arc(x,y-16,9,0,7);c.fill();rr(c,x-14,y-8,28,14,7);
+      if(K.cheer>0&&i%2===(Math.floor(t*4)%2)){c.strokeStyle=c.fillStyle;c.lineWidth=4;c.lineCap='round';c.beginPath();c.moveTo(x-10,y-6);c.lineTo(x-16,y-30);c.moveTo(x+10,y-6);c.lineTo(x+16,y-30);c.stroke()}}
+  },
+});
+// ---------- karaoke ----------
+const STREET={msk:'на Арбате',spb:'на Невском',kzn:'на Баумана',sochi:'на набережной',ekb:'на Плотинке',nsk:'у Оперного',vdk:'на Спортивной гавани',kgd:'у Рыбной деревни'};
+let kHit=null;
+function singMenu(){const c=C(),kc=Math.round(500*c.pay/50)*50;
+  ask('Где петь?','Голос есть, настроение есть, осталось выбрать сцену.',[
+    {t:`Караоке-бар · ${fmt(kc)} ₽`,m:'больше подписчиков и кайфа',dis:()=>S.money<kc,go(){S.money-=kc;karaoke('bar')}},
+    {t:`На улице ${STREET[S.city]}`,m:'бесплатно, прохожие кидают деньги',go(){karaoke('street')}}],'Петь');
+}
+function karaoke(venue){
+  const song=pick(SONGS),notes=[];let i=0,pos=0,dir=1,zone=0,raf=0,last=0,locked=true;
+  const width=clamp(14+S.vocal*1.6+(S.booze>=1&&S.booze<=2?6:0)-(S.booze>=3?4:0),10,34),wob=S.booze>=3;
+  openSheet(`<div class="kicker">${venue==='bar'?'Караоке-бар':'Уличный концерт'} · ${C().name}</div><h3>«${song.t}»</h3>
+    <canvas class="mini-stage" id="kStage" aria-hidden="true"></canvas>
+    <p class="muted">Жми, когда жёлтая линия в зелёной зоне. В центре зоны чище звук.${wob?' Градус высокий, линия пляшет.':S.booze>=1?' Пара бокалов добавила смелости: зона шире.':''}</p>
+    <div class="lyric" id="kLyric"></div>
+    <div class="track" id="kTrack"><div class="zone" id="kZone"><b></b></div><div class="needle" id="kNeedle"></div></div>
+    <div class="notes" id="kNotes"><i></i><i></i><i></i><i></i><i></i></div>
+    <div class="verdict" id="kVerdict" aria-live="polite"></div>
+    <button type="button" class="big-btn" id="kBtn">Попасть в ноту</button>`);
+  const st=new Stage($('kStage'),'karaoke');st.karaokeInit(venue);
+  function setNote(){if(!$('kZone'))return;zone=rnd(6,94-Math.round(width));
+    $('kZone').style.left=zone+'%';$('kZone').style.width=width+'%';$('kLyric').textContent=song.l[i];
+    pos=chance(.5)?0:100;dir=pos?-1:1;locked=false;$('kBtn').disabled=false;$('kVerdict').textContent=''}
+  function tick(t){if(!$('kNeedle'))return;if(!last)last=t;const dt=Math.min(.05,(t-last)/1000);last=t;
+    if(!locked){let sp=(58+i*13)*(wob?1.3:1);if(wob)sp*=1+.55*Math.sin(t/170);
+      pos+=dir*sp*dt;if(pos>=100){pos=100;dir=-1}if(pos<=0){pos=0;dir=1}$('kNeedle').style.left=pos+'%'}
+    raf=requestAnimationFrame(tick)}
+  function hit(){if(locked||!$('kBtn'))return;locked=true;$('kBtn').disabled=true;
+    const off=Math.abs(pos-(zone+width/2));const s=off<=width*.15?2:off<=width/2?1:0;
+    notes.push(s);$('kNotes').children[i].className='n'+s;$('kVerdict').textContent=s===2?'Чисто!':s===1?'Нормально':'Мимо нот';
+    st.note(s);i++;if(i<5)setTimeout(setNote,650);else{st.karaokeEnd(notes.reduce((a,b)=>a+b,0));setTimeout(finish,1500)}}
+  function finish(){cancelAnimationFrame(raf);kHit=null;closeSheet();
+    const sc=notes.reduce((a,b)=>a+b,0);S.songs++;
+    const e={vocal:.4,content:sc>=7?2:1};let t;
+    if(venue==='bar'){e.fame=Math.round(sc*rnd(90,150)*(1+S.vocal/8)/10)*10;e.fun=sc*2+5;
+      t=sc>=8?`Спела «${song.t}» так, что весь зал снимал на телефоны.`:sc>=5?`«${song.t}» прозвучала уверенно, пара столиков подпевала.`:`«${song.t}» вышла мимо нот, но с душой. Зал смеялся вместе с ней.`}
+    else{e.money=Math.round(sc*C().pay*rnd(70,140)/10)*10;e.fame=sc*rnd(20,50);e.fun=sc+4;
+      t=sc>=8?`Собрала толпу ${STREET[S.city]}. В шляпу летели купюры.`:sc>=5?`Пела ${STREET[S.city]}, прохожие притормаживали и кидали мелочь.`:`Пела ${STREET[S.city]}. Голуби остались, люди нет.`}
+    say(t+` Счёт ${sc} из 10.`,venue==='bar'?'караоке':'улица',sc>=8?'big':sc>=5?'good':'',fx(e));
+    if(sc>=9&&chance(.35))say('После выступления подошёл продюсер и взял номер. Подписчики пишут «когда альбом».','продюсер','big',fx({fame:3000,fun:10}));
+    done()}
+  $('kBtn').onclick=hit;$('kTrack').onpointerdown=hit;kHit=hit;
+  setTimeout(setNote,400);raf=requestAnimationFrame(tick);
+}
+
+// ---------- fight ----------
+function fight(en,intro){
+  S.fights++;const maxE=en.hp,hp0=S.hp;let eh=en.hp,next='atk',tell='',ended=false,lock=false;
+  const pd=()=>Math.round(7+S.punch*1.3+S.booze*1.5),scale=.92+Math.max(0,en.hp-24)/22*.2;
+  function plan(){const r=Math.random(),a=en.ai;next=r<a[0]?'atk':r<a[0]+a[1]?'blk':'dge';tell=pick(TELLS[chance(.7)?next:pick(['atk','blk','dge'])])}
+  openSheet(`<div class="kicker">Драка · ${C().name}</div><h3>${en.n}</h3><canvas class="mini-stage" id="fStage" aria-hidden="true"></canvas><div class="fbody" id="fBody"></div>`);
+  const st=new Stage($('fStage'),'fight');st.fightInit(enemyLook(en.n),scale);
+  const bars=()=>`<div class="fighters"><div class="ftr"><div class="g-l">Милана<b>${S.hp}</b></div><div class="bar"><i style="width:${S.hp}%;--c:var(--siren)"></i></div></div>
+    <div class="ftr"><div class="g-l">Противник<b>${eh}</b></div><div class="bar"><i style="width:${eh/maxE*100}%;--c:var(--muted)"></i></div></div></div>`;
+  function draw(msg,endHtml){
+    $('fBody').innerHTML=bars()+(endHtml||`<div class="tell">Противник ${tell}</div>
+      <div class="flog" aria-live="polite">${msg}</div>
+      <div class="moves">
+        <button type="button" class="choice" data-m="atk"><span class="act-t">Ударить</span><span class="act-m">урон ~${pd()}</span></button>
+        <button type="button" class="choice" data-m="blk"><span class="act-t">Блок</span><span class="act-m">гасит 70%</span></button>
+        <button type="button" class="choice" data-m="dge"><span class="act-t">Уклон</span><span class="act-m">встречный ×1,4</span></button>
+      </div><button type="button" class="ghost" data-m="run">Свалить дворами</button>`);
+    $('fBody').querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>move(b.dataset.m));
+  }
+  function move(p){if(ended||lock)return;
+    if(p==='run')return end('run');
+    const E=en.d*(.8+Math.random()*.4),P=pd(),e=next;let dE=0,dP=0,m;
+    if(p==='atk'){if(e==='atk'){dE=P;dP=E;m='Обмен ударами! Обоим прилетело.'}else if(e==='blk'){dE=P*.35;m='Закрылся, удар прошёл вскользь.'}else{dP=E*.5;m='Промах! Увернулся и ткнул в ответ.'}}
+    else if(p==='blk'){if(e==='atk'){dP=E*.3;m='Блок! Удар почти не прошёл.'}else{m='Стоят, смотрят друг на друга. Милана отдышалась.'}}
+    else{if(chance(S.booze*.08)){dP=E;m='Хотела увернуться, но градус повёл в сторону. Прилетело.'}else if(e==='atk'){dE=P*1.4;m='Нырок под руку и встречный! Красота.'}else{m='Обе стороны пританцовывают. Ничья в раунде.'}}
+    eh=Math.max(0,eh-Math.round(dE));S.hp=clamp(S.hp-Math.round(dP));
+    lock=true;$('fBody').querySelectorAll('button').forEach(b=>b.disabled=true);
+    st.fightAct(p,e,dP>=1,dE>=1);
+    setTimeout(()=>{lock=false;if(!$('fBody'))return;if(eh<=0)return end('win');if(S.hp<=10)return end('lose');plan();draw(m)},RM?150:640);
+  }
+  function end(r){ended=true;st.fightEnd(r);const lost=hp0-S.hp,hpChip=lost>0?[{t:`−${lost} здоровья`,c:'dn'}]:[];let t,kind,ch;
+    if(r==='win'){S.wins++;ch=fx({fame:Math.round((150+maxE*12)*rnd(8,14)/100)*10,fun:15,content:2,punch:.5});t=`${en.n} лежит и просит не снимать. Поздно, уже сняли.`;kind='big';st.confetti(30)}
+    else if(r==='lose'){ch=fx({fun:-10,punch:.3});t=`${en.n} оказался сильнее. Друзья утащили Милану подальше.`;kind='bad'}
+    else{ch=fx({fun:-5});t='Милана решила, что оно того не стоит, и ушла дворами.';kind=''}
+    say(t,'драка',kind,hpChip.concat(ch));
+    let police='';
+    if(r!=='run'&&chance(.22)){const p=Math.min(S.money,1000);police=`Приехал наряд. Протокол по статье 20.1 КоАП, мелкое хулиганство, штраф ${fmt(p)} ₽.`;say(police,'полиция','bad',fx({money:-p,fun:-5}))}
+    draw('',`<div class="tell">${r==='win'?'Победа.':r==='lose'?'Поражение.':'Ушла без боя.'} ${t}</div>${police?`<p class="muted">${police}</p>`:''}<button type="button" class="big-btn" id="fDone">Дальше</button>`);
+    $('fDone').onclick=()=>{closeSheet();done()};$('fDone').focus({preventScroll:true});
+  }
+  plan();draw(`${intro?intro+' ':''}Подсказка о замысле противника верна примерно в 7 случаях из 10.`);
+  const f=$('fBody').querySelector('.choice');if(f)f.focus({preventScroll:true});
+}
+
+// ---------- travel ----------
+const dn=n=>{const a=n%10,b=n%100;return n+' '+(a===1&&b!==11?'день':a>=2&&a<=4&&(b<12||b>14)?'дня':'дней')};
+function travelMenu(){
+  let sel=ORDER.find(k=>k!==S.city&&!S.visited[k])||ORDER.find(k=>k!==S.city);
+  function draw(){
+    const km=dist(S.city,sel),to=CITIES[sel],left=MAX_DAY-S.day;
+    const pPlane=Math.round((3500+km*2.6)/100)*100,pTrain=Math.max(900,Math.round(km*2.1/100)*100);
+    const dTrain=Math.max(1,Math.ceil(km/1300)),dHitch=Math.max(1,Math.ceil(km/800));
+    const noCar=sel==='kgd'||S.city==='kgd';
+    const warn=d=>d>left?' · тур закончится в дороге':'';
+    const modes=[
+      {id:'plane',t:`Самолёт · ${fmt(pPlane)} ₽`,m:'прилёт сегодня, −25 сил',dis:S.money<pPlane,price:pPlane,days:0},
+      {id:'train',t:`Плацкарт · ${fmt(pTrain)} ₽`,m:`${dn(dTrain)} в пути, отоспится в вагоне${warn(dTrain)}`,dis:S.money<pTrain,price:pTrain,days:dTrain},
+      {id:'hitch',t:'Автостоп · бесплатно',m:noCar?'через Литву без визы не пустят':`${dn(dHitch)} на трассе${warn(dHitch)}`,dis:noCar,price:0,days:dHitch},
+    ];
+    $('sheet').innerHTML=`<div class="kicker">Куда дальше · ${fmt(S.money)} ₽ на карте</div>
+      <div class="strip" role="group" aria-label="Города">${ORDER.map(k=>`<button type="button" class="stop${k===S.city?' here':S.visited[k]?' been':''}${k===sel?' sel':''}" data-k="${k}" ${k===S.city?'disabled':''} aria-label="${CITIES[k].name}"><span class="dot"></span><span>${CITIES[k].short}</span></button>`).join('')}</div>
+      <div class="legend"><span><i class="l-here"></i>здесь</span><span><i class="l-been"></i>уже была</span><span><i></i>ещё нет</span></div>
+      <h3>${C().short} → ${to.name}</h3><p class="muted">${fmt(km)} км по дорогам · ${to.sub}</p>
+      <div class="choices">${modes.map(o=>`<button type="button" class="choice" data-g="${o.id}" ${o.dis?'disabled':''}><span class="act-t">${o.t}</span><span class="act-m">${o.m}</span></button>`).join('')}
+      <button type="button" class="choice" data-g="stay"><span class="act-t">Остаться</span><span class="act-m">тут ещё не всё</span></button></div>`;
+    $('sheet').querySelectorAll('.stop').forEach(b=>b.onclick=()=>{sel=b.dataset.k;draw()});
+    $('sheet').querySelectorAll('[data-g]').forEach(b=>b.onclick=()=>{const g=b.dataset.g;if(g==='stay'){closeSheet();return done()}const o=modes.find(x=>x.id===g);go(o,km)});
+  }
+  function go(o,km){closeSheet();const dest=sel,to=CITIES[dest];
+    const cap=o.id==='plane'?`Милана летит: ${to.name}`:o.id==='train'?`Плацкарт до города ${to.name}`:'Милана ловит попутку';
+    scene(o.id,{cap},o.id==='plane'?2.4:2.7,()=>arrive(o,km,dest))}
+  function arrive(o,km,dest){const to=CITIES[dest],first=!S.visited[dest],ev=pick(ROAD[o.id]);
+    S.money-=o.price;S.km+=km;
+    const lbl={plane:'Самолёт',train:'Плацкарт',hitch:'Автостоп'}[o.id];
+    const chips=(o.price?[{t:`−${fmt(o.price)} ₽`,c:'dn'}]:[]).concat(fx(ev[2]));
+    say(`${lbl} до города ${to.name}, ${fmt(km)} км. ${ev[0]}`,o.id==='plane'?'перелёт':o.id==='train'?'поезд':'трасса',ev[1],chips);
+    S.city=dest;S.visited[dest]=1;
+    if(o.id==='plane'){S.hour+=Math.max(3,Math.round(km/900)+2);S.energy=clamp(S.energy-25)}
+    else{S.day+=o.days;S.booze=0;S.hour=9+rnd(0,2);S.energy=o.id==='train'?95:80;
+      const c2=fx({hp:o.id==='train'?4*o.days:-2*o.days,fun:-3*o.days});
+      if(S.day>MAX_DAY){S.day=MAX_DAY+1;say('Тур закончился прямо в дороге.','финиш','',c2);return ending('time')}
+      if(c2.length)say(`Утро. День ${S.day}. Дорога позади.`,'утро','',c2)}
+    if(first)say(`${to.name}! Здесь Милана впервые. Новые улицы, новый контент.`,'новый город','big',fx({content:2,fun:10}));
+    else say(`Снова ${to.name}. Тут её уже помнят.`,'город','',fx({fun:4}));
+    if(STAGE)STAGE.flash=.5}
+  openSheet('');draw();
+  const f=$('sheet').querySelector('.choice:not(:disabled)');if(f)f.focus({preventScroll:true});
+}
+
+// ---------- boot ----------
+$('actions').addEventListener('click',e=>{const b=e.target.closest('.act');if(b&&!b.disabled&&!S.over&&$('modal').hidden)doAction(b.dataset.a)});
+$('newGame').onclick=()=>{if(busy)return;if(S.over){closeSheet();return reset()}
+  ask('Начать новый тур?','Текущий прогресс Миланы пропадёт: дни, деньги, подписчики.',[
+    {t:'Да, заново',m:'день 1, Москва, 5 000 ₽',go(){reset()}},
+    {t:'Нет, продолжить',m:'вернуться в игру',go(){}}],'Новый тур')};
+document.addEventListener('keydown',e=>{if(kHit&&(e.code==='Space'||e.key===' ')){e.preventDefault();kHit()}});
+function start(data){if(!STAGE)STAGE=new Stage($('stageCv'),'main');S=(data&&data.S)||load()||null;if(!S){S=fresh();intro()}render();save();if(S.over)showEnding()}
+start({});
+</script>
+</body>
+</html>
