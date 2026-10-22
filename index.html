@@ -169,6 +169,22 @@ button{font:inherit;color:inherit}
 .stage-cap{position:absolute;left:10px;top:10px;font-family:var(--f-mono);font-size:11.5px;background:rgba(10,12,16,.72);color:var(--paper);padding:4px 8px;border-radius:4px;max-width:calc(100% - 20px)}
 .actions.busy .act{opacity:.55}
 .fbody{display:grid;gap:12px}
+
+/* quest, achievements, sound toggles */
+.foot{flex-wrap:wrap}
+.foot-btns{display:flex;gap:6px;flex-wrap:wrap}
+.quest{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px dashed var(--mark);border-radius:8px;padding:8px 12px;font-size:13.5px;min-width:0}
+.quest .q-k{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--mark);white-space:nowrap}
+.quest .q-t{flex:1;min-width:0}
+.quest b{font-family:var(--f-mono);font-weight:500;font-variant-numeric:tabular-nums;white-space:nowrap}
+.quest.done{border-style:solid;border-color:var(--route)}
+.quest.done .q-k,.quest.done b{color:#9fe0b6}
+.achs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.ach{background:var(--panel-2);border-radius:8px;padding:8px 10px;display:grid;gap:2px;font-size:12.5px;color:var(--muted)}
+.ach b{font-family:var(--f-display);font-weight:500;font-size:12.5px;color:var(--paper)}
+.ach:not(.got){opacity:.55}
+.ach.got{outline:1px solid rgba(242,194,48,.55)}
+.toast{position:fixed;left:50%;top:calc(12px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:70;background:var(--mark);color:var(--ink-on-mark);font-family:var(--f-display);font-weight:700;font-size:13.5px;padding:10px 16px;border-radius:8px;box-shadow:0 10px 30px -10px rgba(0,0,0,.8);max-width:calc(100% - 32px);text-align:center;animation:up .25s ease}
 @media (min-width:880px){.stage{height:210px}}
 @media (max-width:380px){.nums{grid-template-columns:repeat(2,minmax(0,1fr))}.act-t{font-size:11.5px}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
@@ -192,15 +208,17 @@ button{font:inherit;color:inherit}
     </div>
     <div class="gauges" id="gauges"></div>
     <div class="nums" id="nums"></div>
+    <div class="quest" id="quest"></div>
     <div class="dash" aria-hidden="true"></div>
     <div class="actions" id="actions"></div>
-    <div class="foot"><span id="tripLbl">Города: 1 из 8</span><button class="ghost" id="newGame" type="button">Новый тур</button></div>
+    <div class="foot"><span id="tripLbl">Города: 1 из 8</span><div class="foot-btns"><button class="ghost" id="sndBtn" type="button">Звук: вкл</button><button class="ghost" id="voiceBtn" type="button">Голос: вкл</button><button class="ghost" id="achBtn" type="button">Ачивки</button><button class="ghost" id="newGame" type="button">Новый тур</button></div></div>
   </section>
   <section class="right">
     <div class="feed-head"><h2>Лента</h2><span>свежее сверху</span></div>
     <ol class="feed" id="feed"></ol>
   </section>
 </div>
+<div class="toast" id="toast" role="status" hidden></div>
 <div class="modal" id="modal" hidden><div class="sheet" id="sheet" role="dialog" aria-modal="true"></div></div>
 <script>
 // ---------- data ----------
@@ -284,6 +302,31 @@ const VPISKA=[
   ['Спала на надувном матрасе, который сдулся к утру. Зато бесплатно.','',{hp:2}],
 ];
 
+const QUESTS=[
+  {id:'walk',t:'Погулять 3 раза',goal:3},
+  {id:'bar',t:'Сходить в бар 2 раза',goal:2},
+  {id:'win',t:'Выиграть драку',goal:1},
+  {id:'sing',t:'Спеть на 7+ из 10',goal:1},
+  {id:'post',t:'Выложить сторис',goal:1},
+  {id:'work',t:'Взять подработку',goal:1},
+  {id:'travel',t:'Переехать в другой город',goal:1},
+];
+const ACH=[
+  {id:'win1',t:'Первая кровь',d:'выиграть первую драку',c:()=>S.wins>=1},
+  {id:'win5',t:'Гроза дворов',d:'выиграть 5 драк',c:()=>S.wins>=5},
+  {id:'city3',t:'Рюкзак собран',d:'побывать в 3 городах',c:()=>Object.keys(S.visited).length>=3},
+  {id:'city8',t:'От моря до моря',d:'побывать во всех 8 городах',c:()=>Object.keys(S.visited).length>=8},
+  {id:'km5',t:'Дальнобой',d:'проехать 5 000 км',c:()=>S.km>=5000},
+  {id:'fame10',t:'Микроблогер',d:'10 000 подписчиков',c:()=>S.fame>=10000},
+  {id:'fame100',t:'Звезда',d:'100 000 подписчиков',c:()=>S.fame>=100000},
+  {id:'rich',t:'Подушка безопасности',d:'20 000 ₽ на карте',c:()=>S.money>=20000},
+  {id:'broke',t:'Ноль на карте',d:'остаться совсем без денег',c:()=>S.money<=0},
+  {id:'tat',t:'Чернила',d:'сделать первое тату',c:()=>S.tattoos>=1},
+  {id:'song5',t:'Голосистая',d:'спеть 5 песен',c:()=>S.songs>=5},
+  {id:'bar10',t:'Завсегдатай',d:'10 раз сходить в бар',c:()=>S.drinks>=10},
+  {id:'quest5',t:'Исполнительная',d:'выполнить 5 заданий дня',c:()=>(S.qDone||0)>=5},
+];
+
 // walk events: run() uses engine helpers (S, C, fx, say, ask, fight, enemy, rndEnemy, rnd, chance, fmt)
 const WALK=[
   {w:2,run(){const m=rnd(3,10)*100;say(`Нашла на лавочке ${fmt(m)} ₽. Оглянулась, никого. Значит, судьба.`,'находка','good',fx({money:m,fun:5}))}},
@@ -306,7 +349,7 @@ const WALK=[
     {t:'Влезть',m:'драка',go(){fight(rndEnemy())}},
     {t:'Снимать на телефон',m:'+3 контента',go(){say('Сняла всё в 4K. Будет что выложить.','драма','',fx({content:3}))}}])}},
   {w:2,run(){ask('Спор на деньги','Мужик у бара уверяет, что перепьёт любую девчонку. Ставка 2 000 ₽.',[
-    {t:'Принять спор',m:'+3 градуса, ставка 2 000 ₽',dis:()=>S.money<2000,go(){S.drinks+=3;if(chance(.45))say('Мужик сполз под стол на третьем. Милана забрала ставку и спела над ним колыбельную.','спор','big',fx({money:2000,booze:3,fame:400,content:2,hp:-6}));else say('Мужик оказался дальнобойщиком с тридцатилетним стажем. Деньги ушли.','спор','bad',fx({money:-2000,booze:3,hp:-8}))}},
+    {t:'Принять спор',m:'+3 градуса, ставка 2 000 ₽',dis:()=>S.money<2000,go(){if(chance(.45))say('Мужик сполз под стол на третьем. Милана забрала ставку и спела над ним колыбельную.','спор','big',fx({money:2000,booze:3,fame:400,content:2,hp:-6}));else say('Мужик оказался дальнобойщиком с тридцатилетним стажем. Деньги ушли.','спор','bad',fx({money:-2000,booze:3,hp:-8}))}},
     {t:'Посмеяться и уйти',m:'ничего не будет',go(){say('«В другой раз, дядя». Дядя расстроился.','спор','',[])}}])}},
   {w:1,run(){ask('Местный рэпер','У него студия за углом. Зовёт записать куплет.',[
     {t:'Записать',m:'зависит от вокала',go(){S.songs++;if(S.vocal>=3.5)say('Куплет вышел огонь. Трек разлетелся по чатам.','музыка','big',fx({fame:rnd(30,60)*100,fun:15,content:2}));else say('Звучит, как кошка в лифте. Рэпер вежливо сказал «интересно».','музыка','',fx({fun:5,content:1}))}},
@@ -343,7 +386,66 @@ const enemy=n=>Object.assign({},ENEMIES.find(e=>e.n===n)||ENEMIES[0]);
 const rndEnemy=()=>Object.assign({},pick(ENEMIES));
 
 function fresh(){return{day:1,city:'msk',money:5000,hp:100,energy:100,fun:55,booze:0,fame:312,content:0,vocal:1,punch:1,hour:10,
-  visited:{msk:1},km:0,fights:0,wins:0,songs:0,drinks:0,tattoos:0,deals:0,feed:[],over:false,endKind:'',seq:0}}
+  visited:{msk:1},km:0,fights:0,wins:0,songs:0,drinks:0,tattoos:0,deals:0,feed:[],over:false,endKind:'',seq:0,
+  q:{id:pick(QUESTS).id,prog:0,done:false},qDone:0,ach:{}}}
+
+// ---------- sound & voice ----------
+const SND={on:true,voice:true,ac:null};
+try{const o=JSON.parse(localStorage.getItem('milana-snd'));if(o){SND.on=!!o.on;SND.voice=!!o.voice}}catch(e){}
+const HAS_TTS='speechSynthesis' in window&&typeof SpeechSynthesisUtterance!=='undefined';
+function actx(){if(!SND.ac){try{SND.ac=new(window.AudioContext||window.webkitAudioContext)()}catch(e){return null}}
+  if(SND.ac.state==='suspended')SND.ac.resume();return SND.ac}
+function tone(f,d,o={}){const a=actx();if(!a)return;const t=a.currentTime+(o.at||0),os=a.createOscillator(),g=a.createGain();
+  os.type=o.type||'square';os.frequency.setValueAtTime(f,t);if(o.to)os.frequency.exponentialRampToValueAtTime(o.to,t+d);
+  g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(o.vol||.08,t+.012);g.gain.exponentialRampToValueAtTime(.0001,t+d);
+  os.connect(g).connect(a.destination);os.start(t);os.stop(t+d+.03)}
+function noise(d,o={}){const a=actx();if(!a)return;const t=a.currentTime+(o.at||0),n=Math.max(1,Math.floor(a.sampleRate*d)),buf=a.createBuffer(1,n,a.sampleRate),ch=buf.getChannelData(0);
+  for(let i=0;i<n;i++)ch[i]=(Math.random()*2-1)*(1-i/n);
+  const s=a.createBufferSource(),fl=a.createBiquadFilter(),g=a.createGain();s.buffer=buf;fl.type=o.type||'lowpass';fl.frequency.value=o.f||1200;g.gain.value=o.vol||.2;
+  s.connect(fl).connect(g).connect(a.destination);s.start(t)}
+const SING_F=[392,440,523,587,659];
+const SFX={
+  click:()=>tone(660,.04,{vol:.025}),
+  coin:()=>{tone(988,.08,{vol:.06});tone(1319,.2,{vol:.06,at:.07})},
+  good:()=>{tone(523,.1,{type:'triangle',vol:.09});tone(784,.18,{type:'triangle',vol:.09,at:.09})},
+  bad:()=>{tone(330,.14,{type:'sawtooth',vol:.045});tone(220,.28,{type:'sawtooth',vol:.045,at:.12})},
+  big:()=>[523,659,784,1047].forEach((f,i)=>tone(f,i===3?.4:.12,{type:'triangle',vol:.09,at:i*.1})),
+  ach:()=>[784,988,1175,1568].forEach((f,i)=>tone(f,i===3?.3:.12,{type:'square',vol:.045,at:i*.08})),
+  hit:()=>{noise(.12,{f:900,vol:.55});tone(150,.14,{type:'sine',to:50,vol:.3})},
+  ouch:()=>{noise(.1,{f:600,vol:.35});tone(520,.2,{type:'sawtooth',to:200,vol:.05})},
+  block:()=>{noise(.06,{type:'highpass',f:2200,vol:.3});tone(200,.06,{vol:.05})},
+  whoosh:()=>noise(.28,{type:'bandpass',f:1500,vol:.35}),
+  clink:()=>{tone(2093,.3,{type:'sine',vol:.06});tone(2637,.35,{type:'sine',vol:.04,at:.03})},
+  kick:()=>tone(120,.15,{type:'sine',to:45,vol:.2}),
+  camera:()=>{noise(.05,{type:'highpass',f:3000,vol:.35});noise(.05,{type:'highpass',f:3000,vol:.3,at:.09})},
+  plane:()=>noise(2.2,{type:'lowpass',f:450,vol:.3}),
+  train:()=>{for(let i=0;i<8;i++)noise(.07,{f:700,vol:.3,at:i*.32+(i%2?.12:0)})},
+  car:()=>{tone(440,.14,{vol:.05,at:.9});tone(440,.14,{vol:.05,at:1.1});tone(70,1.3,{type:'sawtooth',to:150,vol:.04,at:1.3})},
+  sing:(s,i)=>{const f=SING_F[i%5];if(!s)return tone(300,.32,{type:'sawtooth',to:170,vol:.05});
+    tone(f,.42,{type:'triangle',vol:.1});if(s===2){tone(f*1.5,.42,{type:'sine',vol:.045});tone(f*2,.3,{type:'sine',vol:.025,at:.05})}},
+};
+function sfx(n,...a){if(!SND.on||!SFX[n])return;try{SFX[n](...a)}catch(e){}}
+function speak(txt){if(!SND.voice||!HAS_TTS||!txt)return;
+  try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(txt.replace(/«|»/g,''));u.lang='ru-RU';
+    const vs=speechSynthesis.getVoices().filter(v=>/^ru/i.test(v.lang));
+    const v=vs.find(v=>/milena|alena|алёна|алена|irina|ирина|svetlana|светлана|female|жен/i.test(v.name))||vs[0];if(v)u.voice=v;
+    u.rate=1.08;u.pitch=1.15;speechSynthesis.speak(u)}catch(e){}}
+function sndSave(){try{localStorage.setItem('milana-snd',JSON.stringify({on:SND.on,voice:SND.voice}))}catch(e){}}
+function sndUI(){$('sndBtn').textContent=SND.on?'Звук: вкл':'Звук: выкл';$('sndBtn').setAttribute('aria-pressed',SND.on);
+  $('voiceBtn').textContent=SND.voice?'Голос: вкл':'Голос: выкл';$('voiceBtn').setAttribute('aria-pressed',SND.voice);$('voiceBtn').hidden=!HAS_TTS}
+
+// ---------- quests & achievements ----------
+function newQuest(){const prev=S.q&&S.q.id;S.q={id:pick(QUESTS.filter(x=>x.id!==prev)).id,prog:0,done:false}}
+function qp(id){const q=S.q;if(!q||q.done||q.id!==id)return;q.prog++;const Q=QUESTS.find(x=>x.id===id);
+  if(q.prog>=Q.goal){q.done=true;S.qDone=(S.qDone||0)+1;say(`Задание дня «${Q.t}» выполнено. Подписчики в восторге и закинули донатов.`,'задание','big',fx({money:rnd(10,25)*100,fame:rnd(3,8)*100,fun:10}))}}
+let toastT=0;
+function toast(t){const el=$('toast');el.textContent=t;el.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>{el.hidden=true},2800)}
+function achCheck(){if(!S.ach)S.ach={};const got=ACH.filter(a=>!S.ach[a.id]&&a.c());if(!got.length)return;
+  got.forEach(a=>{S.ach[a.id]=1;say(`Ачивка «${a.t}»: ${a.d}.`,'ачивка','big',fx({fame:300}))});
+  toast('🏆 Ачивка: '+got.map(a=>a.t).join(', '))}
+function achMenu(){if(busy||!$('modal').hidden)return;const n=Object.keys(S.ach||{}).length;
+  openSheet(`<div class="kicker">Ачивки · ${n} из ${ACH.length}</div><h3>Достижения тура</h3><div class="achs">${ACH.map(a=>`<div class="ach${S.ach[a.id]?' got':''}"><b>${S.ach[a.id]?'🏆':'🔒'} ${a.t}</b><span>${a.d}</span></div>`).join('')}</div><button type="button" class="big-btn" id="achClose">Закрыть</button>`);
+  $('achClose').onclick=closeSheet}
 
 function dist(a,b){const A=CITIES[a],B=CITIES[b],R=6371,r=x=>x*Math.PI/180;
   const h=Math.sin(r(B.lat-A.lat)/2)**2+Math.cos(r(A.lat))*Math.cos(r(B.lat))*Math.sin(r(B.lon-A.lon)/2)**2;
@@ -411,6 +513,7 @@ const canDo=a=>S.energy>=a.e&&(!a.cost||S.money>=a.cost())&&(!a.need||a.need());
 const SCENE={walk:[1.9,'гуляет'],bar:[2.1,'отрывается в баре'],food:[1.5,'перекусывает'],post:[1.9,'снимает сторис']};
 function setCap(t){const el=$('stageCap');if(!el)return;el.textContent=t||'';el.hidden=!t}
 function scene(name,o,dur,cb){if(!STAGE){cb&&cb();return done()}
+  sfx({plane:'plane',train:'train',hitch:'car'}[name]);
   busy=true;setCap(o&&o.cap);render();STAGE.play(name,o,dur,()=>{busy=false;setCap('');if(cb)cb();done()})}
 function doAction(id){
   const a=ACTIONS.find(x=>x.id===id);if(!a||!canDo(a)||busy)return;
@@ -422,10 +525,10 @@ function doAction(id){
 }
 
 const H={
-  walk(){const pool=WALK.filter(e=>(!e.city||e.city===S.city)&&(!e.when||e.when()));
+  walk(){qp('walk');const pool=WALK.filter(e=>(!e.city||e.city===S.city)&&(!e.when||e.when()));
     let t=pool.reduce((s,e)=>s+e.w,0)*Math.random();for(const e of pool){t-=e.w;if(t<=0)return e.run()}pool[0].run()},
   bar(){const c=C();S.money-=c.bar;S.drinks++;
-    say(pick(BAR_LINES),'бар','',fx({fun:rnd(10,16),booze:1,hp:-4,content:1}));
+    say(pick(BAR_LINES),'бар','',[{t:`−${fmt(c.bar)} ₽`,c:'dn'}].concat(fx({fun:rnd(10,16),booze:1,hp:-4,content:1})));qp('bar');
     if(S.booze>=4&&chance(.5))return blackout();
     if(chance(.16*c.fight))return ask('Конфликт у стойки',pick(['Какой-то тип пролил на Милану пиво и не извинился.','Девушка за соседним столом заявила, что Милана строит глазки её парню.','Компания у бильярда решила, что это их бар.']),[
       {t:'Разобраться',m:'драка',go(){fight(rndEnemy())}},
@@ -443,11 +546,11 @@ const H={
     ask('Подработка на вечер',`Чат «Работа ${c.name}» предлагает:`,list.map(g=>{
       const p=Math.round(g.p*c.pay/100)*100,locked=g.need&&S[g.need]<g.min;
       return{t:g.t,m:locked?`нужен ${g.need==='vocal'?'вокал':'удар'} ${g.min}+`:`+${fmt(p)} ₽`,dis:()=>locked,go(){
-        const e={money:p,fun:-8};for(const k in g.fx||{})e[k]=(e[k]||0)+g.fx[k];scene('work',{cap:`Милана работает: ${g.t.toLowerCase()}`},1.9,()=>say(g.note,'работа','',fx(e)))}}}),'Подработка')},
+        const e={money:p,fun:-8};for(const k in g.fx||{})e[k]=(e[k]||0)+g.fx[k];scene('work',{cap:`Милана работает: ${g.t.toLowerCase()}`},1.9,()=>{say(g.note,'работа','',fx(e));qp('work')})}}}),'Подработка')},
   food(){S.money-=350;const w=S.city==='spb'?'Шаверма':'Шаурма';
-    say(pick([`${w} у вокзала. Лучшая в городе, как и все остальные.`,`${w} с двойным сыром. Жизнь налаживается.`,`Съела ${w.toLowerCase()} на ходу и ни капли соуса на кроссовках.`]),'еда','good',fx({hp:12,energy:8,booze:-1}))},
+    say(pick([`${w} у вокзала. Лучшая в городе, как и все остальные.`,`${w} с двойным сыром. Жизнь налаживается.`,`Съела ${w.toLowerCase()} на ходу и ни капли соуса на кроссовках.`]),'еда','good',[{t:'−350 ₽',c:'dn'}].concat(fx({hp:12,energy:8,booze:-1})))},
   post(){const g=Math.round(S.content*(70+S.fame/60)*(.6+Math.random()*.8)*(.5+S.fun/100)/10)*10;
-    say(pick(['Выложила сторис. Залетело.','Скинула карусель из десяти фоток. В комментах пишут «ору».','Смонтировала рилс под свой же голос.','Сделала пост «30 дней без тормозов: день '+S.day+'».']),'сторис',g>3000?'big':'good',fx({fame:g,content:-S.content,fun:5}))},
+    say(pick(['Выложила сторис. Залетело.','Скинула карусель из десяти фоток. В комментах пишут «ору».','Смонтировала рилс под свой же голос.','Сделала пост «30 дней без тормозов: день '+S.day+'».']),'сторис',g>3000?'big':'good',fx({fame:g,content:-S.content,fun:5}));qp('post')},
 };
 
 function blackout(){
@@ -474,7 +577,7 @@ function sleepMenu(forced){const c=C();
 }
 
 function newDay(o){
-  const h=S.booze;S.day++;S.booze=0;S.hour=9+Math.min(h,4)+rnd(0,1);
+  const h=S.booze;S.day++;S.booze=0;newQuest();S.hour=9+Math.min(h,4)+rnd(0,1);
   S.energy=Math.min(o.cap||100,100-h*10);
   const ch=fx({hp:(o.hp||0)-h*3,fun:-6});
   if(S.day>MAX_DAY)return ending('time');
@@ -497,7 +600,7 @@ function showEnding(){
   else if(S.money>=50000){rank='Тусовщица с бизнес-жилкой';desc='Кайфовала и ещё заработала. Редкий талант.'}
   else if(S.drinks>=35){rank='Чемпионка барной стойки';desc='Бармены разных городов передают привет.'}
   else{rank='Просто кайфовала';desc='Тридцать дней свободы, сотня историй и ни одного скучного вечера.'}
-  const kv=[['Дней в туре',Math.min(S.day,MAX_DAY)],['Городов',`${v} из 8`],['Километров',fmt(S.km)],['Подписчиков',fmt(S.fame)],['Драк выиграно',`${S.wins} из ${S.fights}`],['Песен спето',S.songs],['Походов в бар',S.drinks],['Татуировок',S.tattoos],['Денег осталось',fmt(S.money)+' ₽']];
+  const kv=[['Дней в туре',Math.min(S.day,MAX_DAY)],['Городов',`${v} из 8`],['Километров',fmt(S.km)],['Подписчиков',fmt(S.fame)],['Драк выиграно',`${S.wins} из ${S.fights}`],['Песен спето',S.songs],['Походов в бар',S.drinks],['Татуировок',S.tattoos],['Денег осталось',fmt(S.money)+' ₽'],['Ачивок',`${Object.keys(S.ach||{}).length} из ${ACH.length}`],['Заданий дня',S.qDone||0]];
   openSheet(`<div class="kicker">Итоги тура</div><div class="ticket"><div class="rank">${rank}</div><p>${desc}</p><div class="dash" aria-hidden="true"></div><div class="kv">${kv.map(r=>`<span>${r[0]}</span><b>${r[1]}</b>`).join('')}</div></div><button type="button" class="big-btn" id="againBtn">Новый тур</button>`);
   $('againBtn').onclick=()=>{closeSheet();reset()};
 }
@@ -509,7 +612,7 @@ function mood(){if(S.over)return'тур окончен';if(S.booze>=4)return'в 
 const gbar=(l,v,c)=>`<div class="g"><div class="g-l">${l}<b>${Math.round(v)}</b></div><div class="bar"><i style="width:${v}%;--c:${c}"></i></div></div>`;
 let lastSeen=0;
 function render(){
-  const c=C();
+  const c=C();if(!S.over)achCheck();
   $('dayLbl').textContent=`День ${Math.min(S.day,MAX_DAY)} из ${MAX_DAY}`;
   $('routeLbl').textContent=c.route;$('cityName').textContent=c.name;$('citySub').textContent=c.sub;
   $('moodLbl').textContent=mood();$('clockLbl').textContent=hh(S.hour);$('moneyLbl').textContent=fmt(S.money)+' ₽';
@@ -522,8 +625,16 @@ function render(){
   $('feed').innerHTML=S.feed.map(e=>`<li class="ev${e.id>lastSeen?' fresh':''}"><div class="ev-top"><span class="tag ${e.kind}">${e.tag}</span><span>д${e.d} · ${hh(e.h)} · ${CITIES[e.c].short}</span></div><p>${e.text}</p>${e.chips.length?`<div class="chips">${e.chips.map(x=>`<span class="chip ${x.c}">${x.t}</span>`).join('')}</div>`:''}</li>`).join('');
   if(lastSeen>0&&STAGE){const nw=S.feed.filter(e=>e.id>lastSeen);const all=[].concat(...nw.slice().reverse().map(e=>e.chips));
     if(all.length)STAGE.chips(all,STAGE.mx||STAGE.w*.42,STAGE.my||STAGE.h-110);
-    if(nw.some(e=>e.kind==='big'))STAGE.confetti(34);if(nw.some(e=>e.kind==='bad'))STAGE.shake=6}
+    if(nw.some(e=>e.kind==='big'))STAGE.confetti(34);if(nw.some(e=>e.kind==='bad'))STAGE.shake=6;
+    if(nw.length){const k=nw.some(e=>e.tag==='ачивка')?'ach':nw.some(e=>e.kind==='big')?'big':nw.some(e=>e.kind==='bad')?'bad':
+        nw.some(e=>e.chips.some(x=>x.c==='up'&&/₽/.test(x.t)))?'coin':nw.some(e=>e.kind==='good')?'good':null;
+      if(k)sfx(k);speak(nw.slice().reverse().map(e=>e.text).join(' ').slice(0,420))}}
   lastSeen=S.seq;
+  const q=S.q,Q=q&&QUESTS.find(x=>x.id===q.id);
+  $('quest').hidden=!Q||S.over;
+  if(Q)$('quest').innerHTML=`<span class="q-k">Задание дня</span><span class="q-t">${Q.t}</span><b>${q.done?'готово ✓':`${q.prog}/${Q.goal}`}</b>`;
+  $('quest').classList.toggle('done',!!(q&&q.done));
+  $('achBtn').textContent=`Ачивки ${Object.keys(S.ach||{}).length}/${ACH.length}`;
 }
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 function load(){try{const s=JSON.parse(localStorage.getItem(KEY));return s&&s.day&&s.feed?s:null}catch(e){return null}}
@@ -721,11 +832,11 @@ Object.assign(Stage.prototype,{
     const L=lookM();
     if(name==='walk')person(c,mx,gy,1,walkP(t),L);
     else if(name==='work'){const P=walkP(t,11);P.al=1.45;P.prop='box';person(c,mx,gy,1,P,L);
-      if(p>.82&&this.once('c'))for(let i=0;i<7;i++)this.float('₽',mx+(Math.random()-.5)*40,gy-40,'#f2c230',16,{vy:-60-Math.random()*40,vx:(Math.random()-.5)*50,g:90,life:1})}
+      if(p>.82&&this.once('c')){sfx('coin');for(let i=0;i<7;i++)this.float('₽',mx+(Math.random()-.5)*40,gy-40,'#f2c230',16,{vy:-60-Math.random()*40,vx:(Math.random()-.5)*50,g:90,life:1})}}
     else if(name==='food'){const P=idleP(t);P.al=2.35+Math.max(0,Math.sin(t*5))*.35;P.prop='roll';P.mouth=Math.max(0,Math.sin(t*5))*.5;person(c,mx,gy,1,P,L);
       if(this.every('h',.4))this.float('♥',mx+(Math.random()-.5)*30,gy-80,'#e8457c',14,{vy:-30,life:1.1})}
     else if(name==='post'){const P=idleP(t);P.al=2.05;P.prop='phone';P.mouth=.35;P.lean=-.05;person(c,mx,gy,1,P,L);
-      if(p>.35&&this.once('f'))this.flash=.75;
+      if(p>.35&&this.once('f')){this.flash=.75;sfx('camera')}
       if(p>.4&&this.every('l',.12))this.float(Math.random()>.4?'♥':'+1',mx+(Math.random()-.5)*80,gy-70,Math.random()>.5?'#e8457c':'#ece6d6',12+Math.random()*8,{vy:-40-Math.random()*20,life:1.2})}
     else person(c,mx,gy,1,idleP(t),L);
   },
@@ -739,8 +850,9 @@ Object.assign(Stage.prototype,{
     c.fillStyle='#4a2f22';c.fillRect(w*.5,h-56,w*.5,56);c.fillStyle='#6b4430';c.fillRect(w*.48,h-60,w*.52,6);
     c.fillStyle='#120d18';c.fillRect(0,h-22,w*.5,22);
     person(c,mx,gy,1,danceP(t),lookM());this.mx=mx;this.my=gy-78;
+    if(this.every('beat',.42))sfx('kick');
     if(this.every('n',.42))this.float(Math.random()>.5?'♪':'♫',mx+(Math.random()-.3)*60,gy-90,Math.random()>.5?'#f2c230':'#e8457c',16,{vy:-26,vx:(Math.random()-.5)*20,life:1.3});
-    if(p>.5&&this.once('clink'))this.burst('ДЗЫНЬ',mx+30,gy-96,'#ece6d6',16);
+    if(p>.5&&this.once('clink')){sfx('clink');this.burst('ДЗЫНЬ',mx+30,gy-96,'#ece6d6',16)}
   },
 
   // ----- fight -----
@@ -760,11 +872,11 @@ Object.assign(Stage.prototype,{
     if(act&&!F.res){mx+=apply(P,F.p,1);ex+=apply(E,F.e,-1);
       const hk=T>.22?Math.max(0,1-(T-.22)/.4):0;if(F.hitP&&hk){P.lean=-.25*hk;mx-=8*hk;P.hurt=1}if(F.hitE&&hk){E.lean=-.25*hk;ex+=8*hk;E.hurt=1}
       if(T>.22&&!F.fired){F.fired=true;const s=F.scale;
-        if(F.hitE){this.burst(pick(['БАМ!','ХРЯСЬ!','БУМ!','ТЫЩ!']),ex,gy-80*s,'#f2c230',22);this.shake=8}
-        if(F.hitP){this.burst(pick(['ОЙ!','АУ!','БАЦ!']),mx,gy-80,'#f3a9a8',18);this.shake=Math.max(this.shake,6)}
-        if(F.p==='blk'&&F.e==='atk')this.burst('БЛОК',mx+10,gy-70,'#9aa3ae',14);
-        if(F.p==='dge'&&F.e==='atk'&&!F.hitP)this.float('ВЖУХ',mx-6,gy-86,'#8fd0ff',14,{vy:-20,life:.9});
-        if(F.p==='atk'&&F.e==='dge')this.float('МИМО',ex,gy-90,'#ece6d6',14,{vy:-20,life:.9});
+        if(F.hitE){this.burst(pick(['БАМ!','ХРЯСЬ!','БУМ!','ТЫЩ!']),ex,gy-80*s,'#f2c230',22);this.shake=8;sfx('hit')}
+        if(F.hitP){this.burst(pick(['ОЙ!','АУ!','БАЦ!']),mx,gy-80,'#f3a9a8',18);this.shake=Math.max(this.shake,6);sfx('ouch')}
+        if(F.p==='blk'&&F.e==='atk'){this.burst('БЛОК',mx+10,gy-70,'#9aa3ae',14);sfx('block')}
+        if(F.p==='dge'&&F.e==='atk'&&!F.hitP){this.float('ВЖУХ',mx-6,gy-86,'#8fd0ff',14,{vy:-20,life:.9});sfx('whoosh')}
+        if(F.p==='atk'&&F.e==='dge'){this.float('МИМО',ex,gy-90,'#ece6d6',14,{vy:-20,life:.9});sfx('whoosh')}
         if(!F.hitP&&!F.hitE&&F.p!=='atk'&&F.e!=='atk')this.float('…',w/2,gy-70,'#9aa3ae',18,{vy:-14,life:.9})}}
     if(F.res==='win'){Object.assign(E,{lie:Math.min(1,F.rt*3),ko:1});const j=Math.abs(Math.sin(t*6));Object.assign(P,{al:2.9+Math.sin(t*8)*.15,ar:2.9-Math.sin(t*8)*.15,bob:j*6,mouth:.7});
       const sn=Math.floor(F.rt/.5);if(F.rt>.3&&F.sn!==sn){F.sn=sn;this.float('★',ex-30,gy-24,'#f2c230',12,{vy:-10,vx:20,life:.9})}}
@@ -802,10 +914,10 @@ const STREET={msk:'на Арбате',spb:'на Невском',kzn:'на Бау
 let kHit=null;
 function singMenu(){const c=C(),kc=Math.round(500*c.pay/50)*50;
   ask('Где петь?','Голос есть, настроение есть, осталось выбрать сцену.',[
-    {t:`Караоке-бар · ${fmt(kc)} ₽`,m:'больше подписчиков и кайфа',dis:()=>S.money<kc,go(){S.money-=kc;karaoke('bar')}},
+    {t:`Караоке-бар · ${fmt(kc)} ₽`,m:'больше подписчиков и кайфа',dis:()=>S.money<kc,go(){S.money-=kc;karaoke('bar',kc)}},
     {t:`На улице ${STREET[S.city]}`,m:'бесплатно, прохожие кидают деньги',go(){karaoke('street')}}],'Петь');
 }
-function karaoke(venue){
+function karaoke(venue,paid){
   const song=pick(SONGS),notes=[];let i=0,pos=0,dir=1,zone=0,raf=0,last=0,locked=true;
   const width=clamp(14+S.vocal*1.6+(S.booze>=1&&S.booze<=2?6:0)-(S.booze>=3?4:0),10,34),wob=S.booze>=3;
   openSheet(`<div class="kicker">${venue==='bar'?'Караоке-бар':'Уличный концерт'} · ${C().name}</div><h3>«${song.t}»</h3>
@@ -827,7 +939,7 @@ function karaoke(venue){
   function hit(){if(locked||!$('kBtn'))return;locked=true;$('kBtn').disabled=true;
     const off=Math.abs(pos-(zone+width/2));const s=off<=width*.15?2:off<=width/2?1:0;
     notes.push(s);$('kNotes').children[i].className='n'+s;$('kVerdict').textContent=s===2?'Чисто!':s===1?'Нормально':'Мимо нот';
-    st.note(s);i++;if(i<5)setTimeout(setNote,650);else{st.karaokeEnd(notes.reduce((a,b)=>a+b,0));setTimeout(finish,1500)}}
+    st.note(s);sfx('sing',s,i);i++;if(i<5)setTimeout(setNote,650);else{st.karaokeEnd(notes.reduce((a,b)=>a+b,0));setTimeout(finish,1500)}}
   function finish(){cancelAnimationFrame(raf);kHit=null;closeSheet();
     const sc=notes.reduce((a,b)=>a+b,0);S.songs++;
     const e={vocal:.4,content:sc>=7?2:1};let t;
@@ -835,7 +947,8 @@ function karaoke(venue){
       t=sc>=8?`Спела «${song.t}» так, что весь зал снимал на телефоны.`:sc>=5?`«${song.t}» прозвучала уверенно, пара столиков подпевала.`:`«${song.t}» вышла мимо нот, но с душой. Зал смеялся вместе с ней.`}
     else{e.money=Math.round(sc*C().pay*rnd(70,140)/10)*10;e.fame=sc*rnd(20,50);e.fun=sc+4;
       t=sc>=8?`Собрала толпу ${STREET[S.city]}. В шляпу летели купюры.`:sc>=5?`Пела ${STREET[S.city]}, прохожие притормаживали и кидали мелочь.`:`Пела ${STREET[S.city]}. Голуби остались, люди нет.`}
-    say(t+` Счёт ${sc} из 10.`,venue==='bar'?'караоке':'улица',sc>=8?'big':sc>=5?'good':'',fx(e));
+    say(t+` Счёт ${sc} из 10.`,venue==='bar'?'караоке':'улица',sc>=8?'big':sc>=5?'good':'',(paid?[{t:`−${fmt(paid)} ₽`,c:'dn'}]:[]).concat(fx(e)));
+    if(sc>=7)qp('sing');
     if(sc>=9&&chance(.35))say('После выступления подошёл продюсер и взял номер. Подписчики пишут «когда альбом».','продюсер','big',fx({fame:3000,fun:10}));
     done()}
   $('kBtn').onclick=hit;$('kTrack').onpointerdown=hit;kHit=hit;
@@ -873,7 +986,7 @@ function fight(en,intro){
     setTimeout(()=>{lock=false;if(!$('fBody'))return;if(eh<=0)return end('win');if(S.hp<=10)return end('lose');plan();draw(m)},RM?150:640);
   }
   function end(r){ended=true;st.fightEnd(r);const lost=hp0-S.hp,hpChip=lost>0?[{t:`−${lost} здоровья`,c:'dn'}]:[];let t,kind,ch;
-    if(r==='win'){S.wins++;ch=fx({fame:Math.round((150+maxE*12)*rnd(8,14)/100)*10,fun:15,content:2,punch:.5});t=`${en.n} лежит и просит не снимать. Поздно, уже сняли.`;kind='big';st.confetti(30)}
+    if(r==='win'){S.wins++;qp('win');ch=fx({fame:Math.round((150+maxE*12)*rnd(8,14)/100)*10,fun:15,content:2,punch:.5});t=`${en.n} лежит и просит не снимать. Поздно, уже сняли.`;kind='big';st.confetti(30)}
     else if(r==='lose'){ch=fx({fun:-10,punch:.3});t=`${en.n} оказался сильнее. Друзья утащили Милану подальше.`;kind='bad'}
     else{ch=fx({fun:-5});t='Милана решила, что оно того не стоит, и ушла дворами.';kind=''}
     say(t,'драка',kind,hpChip.concat(ch));
@@ -918,12 +1031,12 @@ function travelMenu(){
     const lbl={plane:'Самолёт',train:'Плацкарт',hitch:'Автостоп'}[o.id];
     const chips=(o.price?[{t:`−${fmt(o.price)} ₽`,c:'dn'}]:[]).concat(fx(ev[2]));
     say(`${lbl} до города ${to.name}, ${fmt(km)} км. ${ev[0]}`,o.id==='plane'?'перелёт':o.id==='train'?'поезд':'трасса',ev[1],chips);
-    S.city=dest;S.visited[dest]=1;
+    S.city=dest;S.visited[dest]=1;qp('travel');
     if(o.id==='plane'){S.hour+=Math.max(3,Math.round(km/900)+2);S.energy=clamp(S.energy-25)}
     else{S.day+=o.days;S.booze=0;S.hour=9+rnd(0,2);S.energy=o.id==='train'?95:80;
       const c2=fx({hp:o.id==='train'?4*o.days:-2*o.days,fun:-3*o.days});
       if(S.day>MAX_DAY){S.day=MAX_DAY+1;say('Тур закончился прямо в дороге.','финиш','',c2);return ending('time')}
-      if(c2.length)say(`Утро. День ${S.day}. Дорога позади.`,'утро','',c2)}
+      newQuest();if(c2.length)say(`Утро. День ${S.day}. Дорога позади.`,'утро','',c2)}
     if(first)say(`${to.name}! Здесь Милана впервые. Новые улицы, новый контент.`,'новый город','big',fx({content:2,fun:10}));
     else say(`Снова ${to.name}. Тут её уже помнят.`,'город','',fx({fun:4}));
     if(STAGE)STAGE.flash=.5}
@@ -938,7 +1051,13 @@ $('newGame').onclick=()=>{if(busy)return;if(S.over){closeSheet();return reset()}
     {t:'Да, заново',m:'день 1, Москва, 5 000 ₽',go(){reset()}},
     {t:'Нет, продолжить',m:'вернуться в игру',go(){}}],'Новый тур')};
 document.addEventListener('keydown',e=>{if(kHit&&(e.code==='Space'||e.key===' ')){e.preventDefault();kHit()}});
-function start(data){if(!STAGE)STAGE=new Stage($('stageCv'),'main');S=(data&&data.S)||load()||null;if(!S){S=fresh();intro()}render();save();if(S.over)showEnding()}
+document.addEventListener('pointerdown',e=>{if(e.target.closest('button'))sfx('click')});
+$('sndBtn').onclick=()=>{SND.on=!SND.on;sndSave();sndUI();sfx('good')};
+$('voiceBtn').onclick=()=>{SND.voice=!SND.voice;sndSave();sndUI();if(SND.voice)speak('Голос включён. Погнали!');else try{speechSynthesis.cancel()}catch(e){}};
+$('achBtn').onclick=achMenu;
+if(HAS_TTS)try{speechSynthesis.getVoices();speechSynthesis.onvoiceschanged=()=>speechSynthesis.getVoices()}catch(e){}
+function start(data){if(!STAGE)STAGE=new Stage($('stageCv'),'main');S=(data&&data.S)||load()||null;if(!S){S=fresh();intro()}
+  if(!S.ach)S.ach={};if(!S.q)newQuest();sndUI();render();save();if(S.over)showEnding()}
 start({});
 </script>
 </body>
