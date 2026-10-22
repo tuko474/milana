@@ -639,7 +639,7 @@ function render(){
 }
 // ---------- Telegram Mini App ----------
 // Впишите сюда ссылку на бота, например 'https://t.me/milana_tour_bot/play' — она уйдёт в кнопку «Поделиться».
-const TG_LINK='https://t.me/MiloNyashBot';
+const TG_LINK='https://t.me/MiloNyashBot/play';
 const TG=(window.Telegram&&Telegram.WebApp&&Telegram.WebApp.initData!==undefined&&Telegram.WebApp.platform!=='unknown')?Telegram.WebApp:null;
 function tgHaptic(k){if(!TG||!TG.HapticFeedback)return;try{
   if(k==='hit'||k==='ouch')TG.HapticFeedback.impactOccurred(k==='hit'?'heavy':'medium');
