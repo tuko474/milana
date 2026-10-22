@@ -13,6 +13,7 @@ img{max-width:100%}
 [hidden]{display:none!important}
 </style>
 <title>Милана в отрыве</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=JetBrains+Mono:wght@500&family=Unbounded:wght@500;700&display=swap">
@@ -424,7 +425,7 @@ const SFX={
   sing:(s,i)=>{const f=SING_F[i%5];if(!s)return tone(300,.32,{type:'sawtooth',to:170,vol:.05});
     tone(f,.42,{type:'triangle',vol:.1});if(s===2){tone(f*1.5,.42,{type:'sine',vol:.045});tone(f*2,.3,{type:'sine',vol:.025,at:.05})}},
 };
-function sfx(n,...a){if(!SND.on||!SFX[n])return;try{SFX[n](...a)}catch(e){}}
+function sfx(n,...a){if(typeof tgHaptic==='function')tgHaptic(n);if(!SND.on||!SFX[n])return;try{SFX[n](...a)}catch(e){}}
 function speak(txt){if(!SND.voice||!HAS_TTS||!txt)return;
   try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(txt.replace(/«|»/g,''));u.lang='ru-RU';
     const vs=speechSynthesis.getVoices().filter(v=>/^ru/i.test(v.lang));
@@ -601,8 +602,8 @@ function showEnding(){
   else if(S.drinks>=35){rank='Чемпионка барной стойки';desc='Бармены разных городов передают привет.'}
   else{rank='Просто кайфовала';desc='Тридцать дней свободы, сотня историй и ни одного скучного вечера.'}
   const kv=[['Дней в туре',Math.min(S.day,MAX_DAY)],['Городов',`${v} из 8`],['Километров',fmt(S.km)],['Подписчиков',fmt(S.fame)],['Драк выиграно',`${S.wins} из ${S.fights}`],['Песен спето',S.songs],['Походов в бар',S.drinks],['Татуировок',S.tattoos],['Денег осталось',fmt(S.money)+' ₽'],['Ачивок',`${Object.keys(S.ach||{}).length} из ${ACH.length}`],['Заданий дня',S.qDone||0]];
-  openSheet(`<div class="kicker">Итоги тура</div><div class="ticket"><div class="rank">${rank}</div><p>${desc}</p><div class="dash" aria-hidden="true"></div><div class="kv">${kv.map(r=>`<span>${r[0]}</span><b>${r[1]}</b>`).join('')}</div></div><button type="button" class="big-btn" id="againBtn">Новый тур</button>`);
-  $('againBtn').onclick=()=>{closeSheet();reset()};
+  openSheet(`<div class="kicker">Итоги тура</div><div class="ticket"><div class="rank">${rank}</div><p>${desc}</p><div class="dash" aria-hidden="true"></div><div class="kv">${kv.map(r=>`<span>${r[0]}</span><b>${r[1]}</b>`).join('')}</div></div><button type="button" class="big-btn" id="againBtn">Новый тур</button><button type="button" class="ghost" id="shareBtn">Поделиться результатом</button>`);
+  $('againBtn').onclick=()=>{closeSheet();reset()};$('shareBtn').onclick=tgShare;
 }
 function reset(){lastSeen=0;S=fresh();intro();render();save()}
 function intro(){say('Милана, 20 лет. Сумка через плечо, 5 000 ₽ на карте и 30 дней свободы. Старт в Москве.','старт','big',[])}
@@ -636,7 +637,36 @@ function render(){
   $('quest').classList.toggle('done',!!(q&&q.done));
   $('achBtn').textContent=`Ачивки ${Object.keys(S.ach||{}).length}/${ACH.length}`;
 }
-function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+// ---------- Telegram Mini App ----------
+// Впишите сюда ссылку на бота, например 'https://t.me/milana_tour_bot/play' — она уйдёт в кнопку «Поделиться».
+const TG_LINK='https://t.me/MiloNyashBot';
+const TG=(window.Telegram&&Telegram.WebApp&&Telegram.WebApp.initData!==undefined&&Telegram.WebApp.platform!=='unknown')?Telegram.WebApp:null;
+function tgHaptic(k){if(!TG||!TG.HapticFeedback)return;try{
+  if(k==='hit'||k==='ouch')TG.HapticFeedback.impactOccurred(k==='hit'?'heavy':'medium');
+  else if(k==='big'||k==='ach'||k==='coin')TG.HapticFeedback.notificationOccurred('success');
+  else if(k==='bad')TG.HapticFeedback.notificationOccurred('error');
+  else if(k==='click')TG.HapticFeedback.selectionChanged()}catch(e){}}
+let cloudT=0;
+function cloudSave(){if(!TG||!TG.CloudStorage)return;clearTimeout(cloudT);cloudT=setTimeout(()=>{
+  try{let s=JSON.stringify(Object.assign({},S,{feed:S.feed.slice(0,8)}));
+    if(s.length>4000)s=JSON.stringify(Object.assign({},S,{feed:S.feed.slice(0,2)}));
+    if(s.length<=4096)TG.CloudStorage.setItem(KEY,s,()=>{})}catch(e){}},1200)}
+function cloudLoad(cb){if(!TG||!TG.CloudStorage)return cb(null);let doneCb=false;const fin=v=>{if(!doneCb){doneCb=true;cb(v)}};
+  setTimeout(()=>fin(null),2500);
+  try{TG.CloudStorage.getItem(KEY,(err,v)=>{try{const s=!err&&v?JSON.parse(v):null;fin(s&&s.day&&s.feed?s:null)}catch(e){fin(null)}})}catch(e){fin(null)}}
+function tgShare(){const v=Object.keys(S.visited).length,link=TG_LINK||location.href.split('#')[0];
+  const text=`Милана в отрыве: ${v} из 8 городов, ${fmt(S.fame)} подписчиков, ${S.wins} побед в драках. Сможешь круче?`;
+  const url=`https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(text)}`;
+  try{if(TG)TG.openTelegramLink(url);else if(navigator.share)navigator.share({text,url:link});else window.open(url,'_blank')}catch(e){}}
+function tgInit(){if(!TG)return;try{
+  TG.ready();TG.expand();if(TG.disableVerticalSwipes)TG.disableVerticalSwipes();
+  if(TG.setHeaderColor)TG.setHeaderColor('#14171c');if(TG.setBackgroundColor)TG.setBackgroundColor('#14171c');
+  if(TG.setBottomBarColor)TG.setBottomBarColor('#14171c');
+  if(TG.enableClosingConfirmation)TG.enableClosingConfirmation();
+  const u=TG.initDataUnsafe&&TG.initDataUnsafe.user;window.TG_NAME=u&&u.first_name||''}catch(e){}}
+tgInit();
+
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}cloudSave()}
 function load(){try{const s=JSON.parse(localStorage.getItem(KEY));return s&&s.day&&s.feed?s:null}catch(e){return null}}
 // ---------- stage: helpers ----------
 const RM=matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -1058,7 +1088,8 @@ $('achBtn').onclick=achMenu;
 if(HAS_TTS)try{speechSynthesis.getVoices();speechSynthesis.onvoiceschanged=()=>speechSynthesis.getVoices()}catch(e){}
 function start(data){if(!STAGE)STAGE=new Stage($('stageCv'),'main');S=(data&&data.S)||load()||null;if(!S){S=fresh();intro()}
   if(!S.ach)S.ach={};if(!S.q)newQuest();sndUI();render();save();if(S.over)showEnding()}
-start({});
+// В Telegram сначала пробуем облачное сохранение: оно живёт в аккаунте и не теряется при смене телефона.
+if(TG&&!load())cloudLoad(s=>start({S:s}));else start({});
 </script>
 </body>
 </html>
