@@ -185,6 +185,14 @@ button{font:inherit;color:inherit}
 .ach b{font-family:var(--f-display);font-weight:500;font-size:12.5px;color:var(--paper)}
 .ach:not(.got){opacity:.55}
 .ach.got{outline:1px solid rgba(242,194,48,.55)}
+.photo{display:block;width:100%;max-height:62vh;object-fit:contain;border-radius:8px;background:#000}
+.album{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.ph{appearance:none;border:1px solid var(--line);border-radius:8px;padding:0;background:var(--panel-2);aspect-ratio:3/4;overflow:hidden;position:relative;cursor:pointer;display:grid;place-items:center;text-align:center}
+.ph img{width:100%;height:100%;object-fit:cover;display:block}
+.ph:disabled{cursor:default}
+.ph span{font-size:10.5px;color:var(--muted);padding:4px;line-height:1.25}
+.ph span b{display:block;font-size:18px;margin-bottom:2px}
+.ph:focus-visible{outline:2px solid var(--mark);outline-offset:2px}
 .toast{position:fixed;left:50%;top:calc(12px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:70;background:var(--mark);color:var(--ink-on-mark);font-family:var(--f-display);font-weight:700;font-size:13.5px;padding:10px 16px;border-radius:8px;box-shadow:0 10px 30px -10px rgba(0,0,0,.8);max-width:calc(100% - 32px);text-align:center;animation:up .25s ease}
 @media (min-width:880px){.stage{height:210px}}
 @media (max-width:380px){.nums{grid-template-columns:repeat(2,minmax(0,1fr))}.act-t{font-size:11.5px}}
@@ -328,6 +336,14 @@ const ACH=[
   {id:'quest5',t:'Исполнительная',d:'выполнить 5 заданий дня',c:()=>(S.qDone||0)>=5},
 ];
 
+// Фотоальбом: фото открывается вместе с ачивкой. Файлы лежат в папке photos/.
+const PHOTOS=[
+  {src:'photos/1.jpg',ach:'win1'},
+  {src:'photos/2.jpg',ach:'city3'},
+  {src:'photos/3.jpg',ach:'fame10'},
+  {src:'photos/4.jpg',ach:'win5'},
+];
+
 // walk events: run() uses engine helpers (S, C, fx, say, ask, fight, enemy, rndEnemy, rnd, chance, fmt)
 const WALK=[
   {w:2,run(){const m=rnd(3,10)*100;say(`Нашла на лавочке ${fmt(m)} ₽. Оглянулась, никого. Значит, судьба.`,'находка','good',fx({money:m,fun:5}))}},
@@ -442,10 +458,20 @@ function qp(id){const q=S.q;if(!q||q.done||q.id!==id)return;q.prog++;const Q=QUE
 let toastT=0;
 function toast(t){const el=$('toast');el.textContent=t;el.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>{el.hidden=true},2800)}
 function achCheck(){if(!S.ach)S.ach={};const got=ACH.filter(a=>!S.ach[a.id]&&a.c());if(!got.length)return;
-  got.forEach(a=>{S.ach[a.id]=1;say(`Ачивка «${a.t}»: ${a.d}.`,'ачивка','big',fx({fame:300}))});
+  got.forEach(a=>{S.ach[a.id]=1;say(`Ачивка «${a.t}»: ${a.d}.`,'ачивка','big',fx({fame:300}));
+    PHOTOS.forEach((p,i)=>{if(p.ach===a.id){photoQ.push(i);say(`Открыто новое фото в альбоме за «${a.t}».`,'фото','big',[])}})});
   toast('🏆 Ачивка: '+got.map(a=>a.t).join(', '))}
-function achMenu(){if(busy||!$('modal').hidden)return;const n=Object.keys(S.ach||{}).length;
-  openSheet(`<div class="kicker">Ачивки · ${n} из ${ACH.length}</div><h3>Достижения тура</h3><div class="achs">${ACH.map(a=>`<div class="ach${S.ach[a.id]?' got':''}"><b>${S.ach[a.id]?'🏆':'🔒'} ${a.t}</b><span>${a.d}</span></div>`).join('')}</div><button type="button" class="big-btn" id="achClose">Закрыть</button>`);
+const photoQ=[];
+const achT=id=>(ACH.find(a=>a.id===id)||{}).t||'';
+function showPhoto(i,back){const p=PHOTOS[i];
+  openSheet(`<div class="kicker">${back?'Фотоальбом':'Открыто новое фото'} · ${i+1} из ${PHOTOS.length}</div><h3>За ачивку «${achT(p.ach)}»</h3><img class="photo" src="${p.src}" alt="Фото ${i+1}"><button type="button" class="big-btn" id="phClose">${back?'Назад к альбому':'Круто!'}</button>`);
+  $('phClose').onclick=()=>{closeSheet();if(back)return achMenu();if(photoQ.length)showPhoto(photoQ.shift())}}
+function photosFree(){if(photoQ.length&&$('modal').hidden&&!busy&&!S.over)showPhoto(photoQ.shift())}
+function achMenu(){if(busy||!$('modal').hidden)return;const n=Object.keys(S.ach||{}).length,np=PHOTOS.filter(p=>S.ach[p.ach]).length;
+  openSheet(`<div class="kicker">Фотоальбом · ${np} из ${PHOTOS.length}</div>
+    <div class="album">${PHOTOS.map((p,i)=>S.ach[p.ach]?`<button type="button" class="ph" data-ph="${i}" aria-label="Фото ${i+1}"><img src="${p.src}" alt="" loading="lazy"></button>`:`<button type="button" class="ph" disabled><span><b>🔒</b>${achT(p.ach)}</span></button>`).join('')}</div>
+    <div class="kicker">Ачивки · ${n} из ${ACH.length}</div><div class="achs">${ACH.map(a=>`<div class="ach${S.ach[a.id]?' got':''}"><b>${S.ach[a.id]?'🏆':'🔒'} ${a.t}${PHOTOS.some(p=>p.ach===a.id)?' 📷':''}</b><span>${a.d}</span></div>`).join('')}</div><button type="button" class="big-btn" id="achClose">Закрыть</button>`);
+  $('sheet').querySelectorAll('[data-ph]').forEach(b=>b.onclick=()=>{closeSheet();showPhoto(+b.dataset.ph,true)});
   $('achClose').onclick=closeSheet}
 
 function dist(a,b){const A=CITIES[a],B=CITIES[b],R=6371,r=x=>x*Math.PI/180;
@@ -495,7 +521,7 @@ function done(){
   if(S.energy<=0||S.hour>=29){
     say(S.energy<=0?'Силы кончились. Милана засыпает на ходу.':'Уже утро, а Милана ещё не ложилась. Организм требует подушку.','отбой','bad',[]);
     render();save();return sleepMenu(true)}
-  render();save();
+  render();save();photosFree();
 }
 
 const ACTIONS=[

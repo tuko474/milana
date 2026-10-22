@@ -37,7 +37,7 @@
 ## Публикация на GitHub Pages
 
 1. Создайте новый репозиторий на GitHub, например `milana-game`.
-2. Загрузите в него файлы `index.html` и `README.md`: кнопка **Add file → Upload files**.
+2. Загрузите в него файлы `index.html`, `README.md` и папку `photos`: кнопка **Add file → Upload files**.
 3. Откройте **Settings → Pages**.
 4. В разделе **Build and deployment** выберите **Source: Deploy from a branch**, ветку `main` и папку `/ (root)`, затем нажмите **Save**.
 5. Через минуту-две игра откроется по адресу `https://<ваш-логин>.github.io/milana-game/`.
